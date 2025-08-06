@@ -162,7 +162,7 @@ module ${module_instance_name}
 
   // Instruction interface (internal)
   logic        instr_req, instr_req_q;
-  logic        instr_gnt, intr_gnt_q;
+  logic        instr_gnt, instr_gnt_ibex;
   logic        instr_rvalid;
   logic [31:0] instr_addr, instr_addr_q;
   logic [31:0] instr_rdata;
@@ -458,7 +458,7 @@ module ${module_instance_name}
     .boot_addr_i,
 
     .instr_req_o        ( instr_req        ),
-    .instr_gnt_i        ( instr_gnt_q      ),
+    .instr_gnt_i        ( instr_gnt_ibex   ),
     .instr_rvalid_i     ( instr_rvalid     ),
     .instr_addr_o       ( instr_addr       ),
     .instr_rdata_i      ( instr_rdata      ),
@@ -582,23 +582,25 @@ module ${module_instance_name}
 
   // Add an optional pipeline stage between Ibex and the address translation
   if (InstructionPipeline) begin : gen_instr_req_pipe
+    // Request is granted for Ibex if the pipeline's request is granted or if the pipeline is empty
+    assign instr_gnt_ibex = instr_gnt || !instr_req_q;
     always_ff @(posedge clk_i or negedge rst_ni) begin
       if (!rst_ni) begin
         instr_req_q  <= 1'b0;
-        instr_gnt_q  <= 1'b0;
         instr_addr_q <= 32'h0;
-      end else begin
+      end else if (instr_gnt_ibex) begin
+        // The request is captured if the pipeline's request is granted or if the pipeline is empty
         instr_req_q  <= instr_req;
-        instr_gnt_q  <= instr_gnt;
-        instr_addr_q <= instr_addr;
+        // Only capture the address if the request is valid
+        if (instr_req) begin
+          instr_addr_q <= instr_addr;
+        end
       end
     end
   end else begin : gen_no_instr_req_pipe
-    always_comb begin
-      instr_gnt_q  = instr_gnt;
-      instr_req_q  = instr_req;
-      instr_addr_q = instr_addr;
-    end
+    assign instr_req_q = instr_req;
+    assign instr_addr_q = instr_addr;
+    assign instr_gnt_ibex = instr_gnt;
   end
 
   //
