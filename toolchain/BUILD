@@ -51,7 +51,6 @@ cc_toolchain(
     enabled_features = [
         "@rules_cc//cc/toolchains/args:experimental_replace_legacy_action_config_features",
         ":feat_rv32_bitmanip",
-        ":feat_warnings_as_errors",
         ":feat_guards",
         ":feat_use_lld",
         ":feat_lto",
@@ -262,7 +261,7 @@ cc_args(
         "@rules_cc//cc/toolchains/actions:compile_actions",
         "@rules_cc//cc/toolchains/actions:link_actions",
     ],
-    args = ["-march=rv32imc_zba_zbb_zbc_zbs"],
+    args = ["-march=rv32imc_zba_zbb_zbc_zbs_zbr0p93_zcb_zcmp"],
     requires_any_of = [":constraint_bitmanip"],
 )
 
@@ -272,7 +271,7 @@ cc_args(
         "@rules_cc//cc/toolchains/actions:compile_actions",
         "@rules_cc//cc/toolchains/actions:link_actions",
     ],
-    args = ["-march=rv32imc"],
+    args = ["-march=rv32imc_zcb_zcmp"],
     requires_any_of = [":constraint_no_bitmanip"],
 )
 
@@ -286,6 +285,7 @@ cc_args(
         "-mabi=ilp32",
         "-mcmodel=medany",
         "-mlittle-endian",
+        "-menable-experimental-extensions",
     ],
 )
 
