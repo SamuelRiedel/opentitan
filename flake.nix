@@ -79,6 +79,24 @@
 
       lrPkgs = lowrisc-nix.packages.${system};
 
+      # A libudev that is safe to dlopen() with RTLD_DEEPBIND from a program
+      # that brings its own malloc. Genus's FlexLM client does exactly that while
+      # computing the host ID and aborts with "realloc(): invalid pointer" on
+      # license checkout. The shim (see util/nix/deepbind_alloc_shim.c) is added
+      # as libudev's first dependency so its allocator calls follow the main
+      # program's. Only Genus is pointed at this (see the profile below).
+      deepbindSafeUdev = pkgs.runCommandCC "deepbind-safe-libudev" {
+        nativeBuildInputs = [pkgs.patchelf];
+      } ''
+        mkdir -p $out/lib
+        $CC -O2 -shared -fPIC -o $out/lib/libdeepbind_alloc_shim.so \
+          ${./util/nix/deepbind_alloc_shim.c}
+        cp -L ${lib.getLib pkgs.systemd}/lib/libudev.so.1 $out/lib/libudev.so.1
+        chmod u+w $out/lib/libudev.so.1
+        patchelf --add-needed libdeepbind_alloc_shim.so \
+          --add-rpath '$ORIGIN' $out/lib/libudev.so.1
+      '';
+
       # A single FHS devshell for all local OpenTitan workflows, built on
       # lowrisc-nix's mkEdaShell. It serves two entry points off the *same*
       # environment:
@@ -140,8 +158,24 @@
         # third_party/rust/extensions.bzl): the LLVM release Bazel would download
         # cannot be dlopen'd under the Nix loader. Set in the FHS profile so
         # Bazel sees it whether launched from `nix develop` or the lint app.
+        #
+        # Genus is wrapped so that it (and only it) picks up the deep-bind-safe
+        # libudev; this runs after the EDA setup has put the real genus on PATH.
         profile = ''
           export OT_BINDGEN_LLVM=${lrPkgs.libclang_21}
+
+          _ot_udev_wrapdir=$(mktemp -d)
+          for _ot_exe in genus; do
+            _ot_real=$(command -v "$_ot_exe" 2>/dev/null) || continue
+            {
+              echo '#!/bin/sh'
+              echo 'export LD_LIBRARY_PATH=${deepbindSafeUdev}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}'
+              echo "exec \"$_ot_real\" \"\$@\""
+            } > "$_ot_udev_wrapdir/$_ot_exe"
+            chmod +x "$_ot_udev_wrapdir/$_ot_exe"
+          done
+          export PATH="$_ot_udev_wrapdir:$PATH"
+          unset _ot_udev_wrapdir _ot_exe _ot_real
         '';
       };
     in {
