@@ -140,8 +140,28 @@
         # third_party/rust/extensions.bzl): the LLVM release Bazel would download
         # cannot be dlopen'd under the Nix loader. Set in the FHS profile so
         # Bazel sees it whether launched from `nix develop` or the lint app.
+        #
+        # Genus's FlexLM client dlopen()s libudev with RTLD_DEEPBIND, which binds
+        # libudev to glibc's malloc while Genus exports its own allocator; license
+        # checkout then aborts with "realloc(): invalid pointer". Preloading
+        # libudev makes it bind normally (to Genus's allocator) before FlexLM's
+        # dlopen() reuses it. Genus is wrapped so only it gets the preload; this
+        # runs after the EDA setup has put the real genus on PATH.
         profile = ''
           export OT_BINDGEN_LLVM=${lrPkgs.libclang_21}
+
+          _ot_wrapdir=$(mktemp -d)
+          for _ot_exe in genus; do
+            _ot_real=$(command -v "$_ot_exe" 2>/dev/null) || continue
+            {
+              echo '#!/bin/sh'
+              echo 'export LD_PRELOAD=${lib.getLib pkgs.systemd}/lib/libudev.so.1''${LD_PRELOAD:+:$LD_PRELOAD}'
+              echo "exec \"$_ot_real\" \"\$@\""
+            } > "$_ot_wrapdir/$_ot_exe"
+            chmod +x "$_ot_wrapdir/$_ot_exe"
+          done
+          export PATH="$_ot_wrapdir:$PATH"
+          unset _ot_wrapdir _ot_exe _ot_real
         '';
       };
     in {
