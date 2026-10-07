@@ -40,5 +40,11 @@
         "vendor": "Cadence",
         "version": "24.03-s007",
         "comment": "Provides xrun for simulations and is used to run our full UVM verification environment."
+    },
+    {
+        "name": "Genus",
+        "vendor": "Cadence",
+        "version": "25.12.000-ISR2",
+        "comment": "Provides genus for synthesis."
     }
 ]
