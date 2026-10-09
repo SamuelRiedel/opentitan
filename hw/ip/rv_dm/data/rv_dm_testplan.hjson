@@ -530,6 +530,53 @@
       tests: ["rv_dm_rom_read_access"]
     }
     {
+      name: cheriot_mode
+      desc: '''
+            Verify that the debug module presents the debug ROM and the abstract command encodings
+            that match the ISA the core is currently executing.
+
+            The core comes out of reset in RV32I and firmware may switch it to CHERIoT once, so
+            this is selected at runtime by the cheriot_ena_i input rather than being a build-time
+            choice.
+
+            - With cheriot_ena_i driven to MuBi4True, read back the debug ROM and verify that it is
+              the CHERIoT debug ROM rather than the RV32I one.
+            - With cheriot_ena_i driven to MuBi4True, send a valid AccessRegister command and read
+              back the generated abstract command. Verify that the four debug scratch register
+              accesses are CSpecialRW instructions, and that the access to the CSR the debugger
+              actually named is still an ordinary CSR access.
+            - Verify that the halt/resume/whereto flow behaves identically in both modes. The
+              whereto word is bit-identical because CHERIoT reuses the jal encoding for CJAL.
+            - Verify that every other sequence, which leaves cheriot_ena_i at an arbitrary encoding
+              that is not MuBi4True, still sees RV32I behaviour. This covers the requirement that
+              the input is decoded strictly and fails closed.
+            '''
+      stage: V2
+      tests: ["rv_dm_cheriot_rom_read_access",
+              "rv_dm_cheriot_abstractcmd_status",
+              "rv_dm_cheriot_halt_resume_whereto"]
+    }
+    {
+      name: cheriot_aarsize
+      desc: '''
+            Verify that 64-bit Access Register commands are accepted exactly when the ISA can
+            express them.
+
+            aarsize == 3 requests a 64-bit register transfer. In CHERIoT mode this moves a
+            capability's address and metadata together and is how a debugger reaches capability
+            metadata; on a 32-bit RV32I hart it is meaningless.
+
+            - Send an AccessRegister command with aarsize == 2 and verify it is accepted in both
+              modes, so that a failure below is attributable to the size.
+            - Send an AccessRegister command with aarsize == 3. Verify that abstractcs.cmderr reads
+              CmdErrNone in CHERIoT mode and CmdErrNotSupported in RV32I mode.
+            - Repeat the aarsize == 3 command for SCR mtdc (regno 0x1d), which behaves the same,
+              and for CSR dcsr (regno 0x7b0), which is not an SCR and is rejected in both modes.
+            '''
+      stage: V2
+      tests: ["rv_dm_cheriot_aarsize"]
+    }
+    {
       name: hartsel_warl
       desc: '''
         Check the WARL behaviour of the hartsel field in dmcontrol

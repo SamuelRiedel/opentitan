@@ -309,6 +309,28 @@
       reseed: 1
     }
     {
+      // Runs in both modes: the sequence randomises cheriot_ena itself, so the reseed count covers
+      // the accepted and the rejected case.
+      name: rv_dm_cheriot_aarsize
+      uvm_test_seq: rv_dm_cheriot_aarsize_vseq
+      reseed: 4
+    }
+    {
+      name: rv_dm_cheriot_rom_read_access
+      uvm_test_seq: rv_dm_cheriot_rom_read_access_vseq
+      reseed: 2
+    }
+    {
+      name: rv_dm_cheriot_abstractcmd_status
+      uvm_test_seq: rv_dm_cheriot_abstractcmd_status_vseq
+      reseed: 2
+    }
+    {
+      name: rv_dm_cheriot_halt_resume_whereto
+      uvm_test_seq: rv_dm_cheriot_halt_resume_whereto_vseq
+      reseed: 2
+    }
+    {
       name: rv_dm_stress_all
       uvm_test_seq: rv_dm_stress_all_vseq
       reseed: 20
