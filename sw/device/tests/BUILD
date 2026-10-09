@@ -819,6 +819,27 @@ opentitan_test(
     deps = CHERIOT_SMOKETEST_DEPS,
 )
 
+# Reads capabilities out through the debug module, before and after switching
+# the core to CHERIoT. The host harness drives rv_dm over raw DMI; see
+# `rv_dm_cheriot_caps.S` for the protocol between the two. The test ROM
+# environment boots with the RMA OTP image, so the debug module is enabled.
+opentitan_test(
+    name = "rv_dm_cheriot_caps",
+    srcs = ["rv_dm_cheriot_caps.S"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+    },
+    fpga = fpga_params(
+        needs_jtag = True,
+        test_cmd = """
+            --bootstrap="{firmware}"
+        """,
+        test_harness = "//sw/host/tests/chip/rv_dm:cheriot_caps",
+    ),
+    platform = CHERIOT_PLATFORM,
+    deps = CHERIOT_SMOKETEST_DEPS,
+)
+
 opentitan_test(
     name = "chip_power_idle_load_test",
     srcs = ["chip_power_idle_load_test.c"],

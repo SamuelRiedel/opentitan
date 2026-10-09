@@ -142,6 +142,20 @@ rust_binary(
 )
 
 rust_binary(
+    name = "cheriot_caps",
+    srcs = [
+        "src/cheriot_caps.rs",
+    ],
+    deps = [
+        "//sw/host/opentitanlib",
+        "@crate_index//:anyhow",
+        "@crate_index//:clap",
+        "@crate_index//:humantime",
+        "@crate_index//:log",
+    ],
+)
+
+rust_binary(
     name = "access_after_wakeup",
     srcs = [
         "src/access_after_wakeup.rs",
