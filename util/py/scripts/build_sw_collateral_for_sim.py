@@ -207,6 +207,16 @@ class BazelRunner:
         logger.info(f"cquery_cmd = {' '.join(cquery_cmd)}")
         return self._run_cmd(cquery_cmd)
 
+    def info(self, key: str) -> str:
+        info_cmd = (
+            self.cmd,
+            "info",
+            *self.airgapped_opts,
+            key,
+        )
+        logger.info(f"info_cmd = {' '.join(info_cmd)}")
+        return self._run_cmd(info_cmd)[0]
+
     def _run_cmd(self, cmd: list[str]) -> list[str]:
         """Run a single subprocess command.
 
@@ -379,6 +389,12 @@ def _deploy_software_collateral(args) -> None:
     bazel_runner.build(bazel_labels, opts=["--output_groups=+rram_otp"])
     logger.info("All labels built.\n")
 
+    # The runfile paths returned by cquery are relative to Bazel's execution root. Resolve them
+    # there rather than through the bazel-out convenience symlink in the workspace, which does not
+    # exist if convenience symlinks are disabled (--experimental_convenience_symlinks=ignore).
+    exec_root = Path(bazel_runner.info("execution_root"))
+    logger.info(f"execution_root = {exec_root}\n")
+
     # Now the build is complete, deploy the files for each target
     for image in args.sw_images:
         logger.info(f"Querying runfiles for image : {image}")
@@ -410,7 +426,7 @@ def _deploy_software_collateral(args) -> None:
 
         # Now copy any runfiles for this image to the test's working directory so they
         # can be accessed easily via relative path.
-        _copy_files_to_run_dir(runfiles, args.run_dir)
+        _copy_files_to_run_dir(runfiles, args.run_dir, exec_root)
         runfiles_str = "\n".join(runfiles)
         logger.info(
             f"Deployed the following collateral:\n[IMAGE]\n{image}\n[FILES]\n{runfiles_str}\n"
@@ -486,14 +502,19 @@ def _get_image_runfiles(iq: ImageQuery, bazel_runner: BazelRunner) -> list[str]:
     return runfiles
 
 
-def _copy_files_to_run_dir(files: list[str], run_dir: Path) -> None:
+def _copy_files_to_run_dir(files: list[str], run_dir: Path, exec_root: Path) -> None:
     """Copy all target artifacts to the run directory.
+
+    Build outputs (paths under bazel-out/) are resolved against exec_root. Other
+    relative paths are source files and are resolved against the workspace, as before.
 
     If the artifact is a .bin, and a .elf file of the same name also exists,
     also copy the equivalent .elf file.
     """
 
     for f in [Path(f) for f in files]:
+        if not f.is_absolute() and f.parts and f.parts[0] == "bazel-out":
+            f = exec_root / f
         shutil.copyfile(f, run_dir / f.name)
         # If we are copying a .bin file, and the corresponding .elf file exists, also copy that
         maybe_elf = f.with_suffix(".elf")
