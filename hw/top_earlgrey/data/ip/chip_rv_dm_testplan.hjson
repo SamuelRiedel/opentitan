@@ -175,6 +175,39 @@
       ]
     }
     {
+      name: chip_sw_rv_dm_cheriot_caps
+      desc: '''Verify that the debug module follows the core's ISA mode and can read capabilities.
+
+            - Initialize the DUT in a HW-debug enabled life cycle state and select the RV_DM TAP.
+            - Run SW that stops twice, once in RV32 mode and once after switching the core to
+              CHERIoT mode, spinning at a known symbol until the debugger sets a5.
+            - At the RV32 stop, halt the CPU via JTAG. Verify that a 64-bit (aarsize = 3) Access
+              Register command is rejected with CmdErrNotSupported, and that a 32-bit read works.
+              Release the SW by writing a5 and resume.
+            - At the CHERIoT stop, halt the CPU. Verify that 64-bit reads of GPRs and of the mtdc
+              Special Capability Register return the capabilities the SW recorded in memory,
+              address in data0 and metadata in data1, and that a 32-bit read returns the address.
+            - Read x16, which does not exist in CHERIoT mode, and verify that the command ends in
+              CmdErrException rather than hanging. This exercises the CHERIoT debug ROM's
+              exception entry.
+            - Write a capability with a 64-bit command and read it back, and verify the bits
+              round-trip. Tags are not carried by the debug module.
+            - Release the SW and resume. The SW verifies that the registers the debug module
+              borrowed came back with their tags and every bit intact.
+            '''
+      stage: V2
+      si_stage: NA
+      tests: ["chip_sw_rv_dm_cheriot_caps"]
+      bazel: ["//sw/device/tests:rv_dm_cheriot_caps_fpga_cw340_test_rom"]
+      lc_states: ["RMA"]
+      features: [
+        "RV_DM.JTAG.DTM",
+        "RV_DM.DBG.DATA_REGS",
+        "RV_DM.DBG.ABSTRACT_COMMAND",
+        "RV_DM.DBG.SBA"
+      ]
+    }
+    {
       name: chip_rv_dm_access_after_wakeup
       desc: '''Verify RV_DM works after wakes up from sleep.
 

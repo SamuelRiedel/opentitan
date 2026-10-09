@@ -1971,6 +1971,14 @@
       run_opts: ["+use_jtag_dmi=1"]
     }
     {
+      // Reads capabilities over JTAG before and after the core switches to CHERIoT.
+      name: chip_sw_rv_dm_cheriot_caps
+      uvm_test_seq: chip_sw_rv_dm_cheriot_caps_vseq
+      sw_images: ["//sw/device/tests:rv_dm_cheriot_caps:1:new_rules"]
+      en_run_modes: ["sw_test_mode_test_rom"]
+      run_opts: ["+use_jtag_dmi=1"]
+    }
+    {
       name: chip_sw_rv_dm_access_after_wakeup
       uvm_test_seq: chip_sw_rv_dm_access_after_wakeup_vseq
       sw_images: ["//sw/device/tests:rv_dm_access_after_wakeup_rma:1:new_rules"]

@@ -38,6 +38,13 @@
  *   A    `a0` lost its tag or changed across the halt
  *   B    `a1` lost its tag or changed across the halt
  *
+ * The chip-level UVM test `chip_sw_rv_dm_cheriot_caps` drives the same
+ * protocol without a console. It waits for the PC to reach
+ * `rv_dm_cheriot_caps_wait_rv32` or `rv_dm_cheriot_caps_wait_cheriot`, takes
+ * the expected capabilities from `rv_dm_cheriot_caps_expected` rather than
+ * from the `CAP` lines, and gets the result from the DV test status window,
+ * which this image only writes when built with `DV_TEST_STATUS`.
+ *
  * As in `cheriot_smoketest.S`, everything up to the mode switch executes as
  * RV32 despite being assembled for CHERIoT, so that part sticks to encodings
  * that are the same in both modes.
@@ -52,6 +59,11 @@
  *                capability after it
  *   a3, a4, t1   console scratch
  *   t2           scratch, and `mtdc` while it is reported
+ *
+ * `rv_dm_cheriot_caps_expected` holds the four capabilities in the order
+ * `s0`, `a0`, `a1`, `mtdc`, eight bytes each, in the in-memory format: address
+ * in the lower word, metadata in the upper. That is exactly what a 64-bit
+ * abstract command returns in `data0` and `data1`.
  */
 
 #include "sw/device/lib/base/multibits_asm.h"
@@ -64,6 +76,19 @@
 #define MISA_E (1 << 4)
 #define MISA_I (1 << 8)
 #define MISA_MODE (MISA_E | MISA_I)
+
+// Test status values for the DV window. A pass is only accepted directly from
+// `IN_TEST`.
+#define DV_STATUS_IN_TEST 0x4354
+#define DV_STATUS_PASSED 0x900d
+#define DV_STATUS_FAILED 0xbaad
+
+// Offsets of the capabilities in `rv_dm_cheriot_caps_expected`.
+#define EXP_S0 0
+#define EXP_A0 8
+#define EXP_A1 16
+#define EXP_MTDC 24
+#define EXP_SIZE 32
 
 // -----------------------------------------------------------------------------
 // Console helpers. These only use `s1` as the base, so the stores encode the
@@ -114,21 +139,21 @@
 .endm
 
 /**
- * Finish a `CAP <name> <address> <metadata>` line for capability register
- * `creg`. The caller prints `CAP <name>` first.
+ * Record capability register `creg` at offset `slot` of
+ * `rv_dm_cheriot_caps_expected`, and finish a `CAP <name> <address> <metadata>`
+ * line for it. The caller prints `CAP <name>` first.
  *
- * The metadata half is read back from memory: storing the capability to the
- * scratch buffer behind `cs0` and loading the upper word gives exactly the bits
- * a 64-bit abstract command should return in `data1`, with no need to decode
- * them here.
+ * The metadata half is read back from memory: storing the capability through
+ * `cs0` and loading the upper word gives exactly the bits a 64-bit abstract
+ * command should return in `data1`, with no need to decode them here.
  */
-.macro putcap creg
+.macro putcap creg, slot
+  csc  \creg, \slot(s0)
   putc ' '
   cgetaddr a2, \creg
   puthex
   putc ' '
-  csc  \creg, 0(s0)
-  lw   a2, 4(s0)
+  lw   a2, (\slot + 4)(s0)
   puthex
   put_crlf
 .endm
@@ -140,11 +165,35 @@
   putc ' '
 .endm
 
-/** Spin until the host writes a non-zero value into `a5`. */
-.macro wait_for_host
+/**
+ * Spin until the host writes a non-zero value into `a5`. `label` is a global
+ * symbol on the spin, so that a testbench can wait for the PC to reach it.
+ */
+.macro wait_for_host label
   addi a5, x0, 0
+  .globl \label
+\label:
+  beqz a5, \label
+.endm
+
+/**
+ * Write `val` to the DV test status window. Works in both modes: the window is
+ * reached through an integer address in RV32 mode and through a capability
+ * derived from the memory root in CHERIoT mode. Uses `t1` and `t2`. Expands to
+ * nothing unless built with `DV_TEST_STATUS`.
+ */
+.macro dv_status val
+#ifdef DV_TEST_STATUS
+  csrr t2, misa
+  andi t2, t2, MISA_E
+  li   t1, TOP_RV_CORE_IBEX_CFG_BASE_ADDR
+  beqz t2, 1f
+  cspecialr ct2, mtdc
+  csetaddr  ct1, ct2, t1
 1:
-  beqz a5, 1b
+  li   t2, \val
+  sw   t2, RV_CORE_IBEX_DV_SIM_WINDOW_REG_OFFSET(t1)
+#endif
 .endm
 
 // -----------------------------------------------------------------------------
@@ -193,6 +242,7 @@ _trap_handler:
   csrr a2, mcause
   puthex
   put_crlf
+  dv_status DV_STATUS_FAILED
 
 .L_trap_park:
   wfi
@@ -219,6 +269,8 @@ _ottf_start:
   addi t2, t2, %lo(_trap_handler)
   csrw mtvec, t2
 
+  dv_status DV_STATUS_IN_TEST
+
   // Rendezvous 1, in RV32 mode.
   putc 'R'
   putc 'V'
@@ -231,7 +283,7 @@ _ottf_start:
   putc 'D'
   putc 'Y'
   put_crlf
-  wait_for_host
+  wait_for_host rv_dm_cheriot_caps_wait_rv32
 
   // Switch to CHERIoT and lock the choice. See `cheriot_smoketest.S` for why
   // `CHERIOT_ENA` is read back before the lock.
@@ -260,15 +312,15 @@ _ottf_start:
   // of the metadata bits, cannot pass by accident:
   //
   //   a1   the memory root itself, with every data permission
-  //   s0   a 16-byte data capability, bounded to the scratch buffer
+  //   s0   a data capability bounded to `rv_dm_cheriot_caps_expected`
   //   a0   derived from PCC, so it carries execute rather than store
   //        permission. `auipcc` rather than `cllc`: there is no symbol to
   //        point at, only the permissions matter, and it needs no relocation.
   cmove     ca1, ct1
-  lui       t2, %hi(kScratch)
-  addi      t2, t2, %lo(kScratch)
+  lui       t2, %hi(rv_dm_cheriot_caps_expected)
+  addi      t2, t2, %lo(rv_dm_cheriot_caps_expected)
   csetaddr  cs0, ct1, t2
-  csetboundsimm cs0, cs0, 16
+  csetboundsimm cs0, cs0, EXP_SIZE
   auipcc    ca0, 0
   csetboundsimm ca0, ca0, 16
 
@@ -277,20 +329,21 @@ _ottf_start:
   cmove ctp, ca0
   cmove ct0, ca1
 
-  // Report each one. `putcap` stores through `cs0`, which is also one of the
-  // registers being reported; that is fine, since the store does not change it.
+  // Record and report each one. `putcap` stores through `cs0`, which is also
+  // one of the registers being recorded; that is fine, since the store does
+  // not change it.
   putcap_prefix
   putc 's'
   putc '0'
-  putcap cs0
+  putcap cs0, EXP_S0
   putcap_prefix
   putc 'a'
   putc '0'
-  putcap ca0
+  putcap ca0, EXP_A0
   putcap_prefix
   putc 'a'
   putc '1'
-  putcap ca1
+  putcap ca1, EXP_A1
   // Not `ct1`: `puthex` uses `t1` as its counter and would clobber it.
   cspecialr ct2, mtdc
   putcap_prefix
@@ -298,7 +351,7 @@ _ottf_start:
   putc 't'
   putc 'd'
   putc 'c'
-  putcap ct2
+  putcap ct2, EXP_MTDC
 
   // Rendezvous 2, in CHERIoT mode.
   putc 'C'
@@ -315,7 +368,7 @@ _ottf_start:
   putc 'D'
   putc 'Y'
   put_crlf
-  wait_for_host
+  wait_for_host rv_dm_cheriot_caps_wait_cheriot
 
   // Everything the host borrowed must be back exactly as it was, tag included.
   // `cseqx` compares all bits and the tag, so on its own it would already
@@ -353,6 +406,7 @@ _ottf_start:
   putc 'S'
   putc 'S'
   put_crlf
+  dv_status DV_STATUS_PASSED
 
 .L_park:
   wfi
@@ -391,6 +445,7 @@ _fail:
   putc ' '
   putr a0
   put_crlf
+  dv_status DV_STATUS_FAILED
 .L_fail_park:
   wfi
   j    .L_fail_park
@@ -398,10 +453,12 @@ _fail:
 
 // -----------------------------------------------------------------------------
 
-  // Holds one capability at a time while `putcap` reads back its upper word.
+  // The capabilities under test as the core held them, recorded by `putcap`.
+  // Global so that a testbench can find it in the ELF.
   .section .bss, "aw", @nobits
   .balign 8
-  .type kScratch, @object
-kScratch:
-  .zero 16
-  .size kScratch, 16
+  .globl rv_dm_cheriot_caps_expected
+  .type rv_dm_cheriot_caps_expected, @object
+rv_dm_cheriot_caps_expected:
+  .zero EXP_SIZE
+  .size rv_dm_cheriot_caps_expected, EXP_SIZE
