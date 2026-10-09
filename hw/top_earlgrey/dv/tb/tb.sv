@@ -581,7 +581,7 @@ module tb;
       // variables first.
       rram_ctrl_bkdr_util data, info;
       rram_ctrl_otp_bkdr_util otp;
-      sram_ctrl_bkdr_util ram_main0, ram_ret0;
+      sram_ctrl_bkdr_util ram_main0, ram_ret0, ram_meta0;
       rom_ctrl_bkdr_util rom;
       chip_mem_e    mem;
       mem_bkdr_util m_mem_bkdr_util[chip_mem_e];
@@ -711,6 +711,22 @@ module tb;
           .words_per_row        (`RAM_RET_MEM_WORDS_PER_ROW));
       m_mem_bkdr_util[RamRet0] = ram_ret0;
       `MEM_BKDR_UTIL_FILE_OP(m_mem_bkdr_util[RamRet0], `RAM_RET_MEM_INST_HIER.`RAM_RET_MEM_TILE_PATH)
+
+      `uvm_info("tb.sv", "Creating mem_bkdr_util instance for RAM META", UVM_MEDIUM)
+      // The CHERIoT metadata SRAM. Like RAM_RET it is never tiled. It is not reachable from the
+      // system bus, so it has no system base address. Data is PRINCE-scrambled with two half-rounds
+      // and stored with inverted 39/32 SECDED. EccCorrection = 0 on its sram_ctrl only disables
+      // correction: the integrity bits are still stored alongside each 32-bit word.
+      ram_meta0 = new(
+          .name  ("mem_bkdr_util[RamMeta]"),
+          .path  (`RAM_META_MEM_PATH),
+          .depth (`RAM_META_MEM_DEPTH),
+          .n_bits(`RAM_META_MEM_DEPTH * EccWordWidth39_32),
+          .err_detection_scheme(mem_bkdr_util_pkg::EccInv_39_32),
+          .num_prince_rounds_half(2),
+          .words_per_row        (`RAM_META_MEM_WORDS_PER_ROW));
+      m_mem_bkdr_util[RamMeta] = ram_meta0;
+      `MEM_BKDR_UTIL_FILE_OP(m_mem_bkdr_util[RamMeta], `RAM_META_MEM_INST_HIER.`RAM_META_MEM_TILE_PATH)
 
       `uvm_info("tb.sv", "Creating mem_bkdr_util instance for ROM", UVM_MEDIUM)
       rom = new(

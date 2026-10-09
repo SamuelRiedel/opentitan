@@ -33,6 +33,11 @@
 `define RAM_RET_MEM_DEPTH          $size(`RAM_RET_MEM_INST_HIER.`RAM_RET_MEM_TILE_PATH)
 `define RAM_RET_MEM_WORDS_PER_ROW  1
 
+// sram_ctrl_meta (CHERIoT metadata). Not tiled.
+`define RAM_META_MEM_TILE_PATH     mem
+`define RAM_META_MEM_DEPTH         $size(`RAM_META_MEM_INST_HIER.`RAM_META_MEM_TILE_PATH)
+`define RAM_META_MEM_WORDS_PER_ROW 1
+
 // rv_core_ibex icache way 0/1 tag and data arrays. All four are single, untiled arrays.
 `define ICACHE_TAG_MEM_TILE_PATH      mem
 `define ICACHE_TAG_MEM_WORDS_PER_ROW  1
