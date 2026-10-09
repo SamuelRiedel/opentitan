@@ -42,6 +42,10 @@ class rv_dm_halt_resume_whereto_vseq extends rv_dm_base_vseq;
     // module: we've picked it out of the code to match, and the same for the offset to the start of
     // the abstract command. Similarly, the "WhereTo instruction" lies at an address which is an
     // implementation detail (WhereToAddr in dm_mem.sv).
+    //
+    // This check needs no CHERIoT variant, which is worth stating explicitly rather than leaving as
+    // a coincidence. CHERIoT reuses the jal encoding for CJAL, so the word the debug module writes
+    // into WHERETO is bit-identical in both modes and dm::jal computes it correctly for either.
     bit [31:0] prog_buf_addr = dm::DataAddr - 4*dm::ProgBufSize;
     bit [31:0] abs_cmd_addr = prog_buf_addr - 4*10;
     bit [31:0] whereto_addr = 'h300;
