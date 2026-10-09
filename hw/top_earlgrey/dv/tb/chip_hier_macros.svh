@@ -20,6 +20,7 @@
 `define OTP_CTRL_HIER         `PD_MAIN_HIER.u_otp_ctrl
 `define RAM_MAIN_HIER         `PD_MAIN_HIER.u_sram_ctrl_main.u_prim_ram_1p_scr
 `define RAM_RET_HIER          `PD_AON_HIER.u_sram_ctrl_ret.u_prim_ram_1p_scr
+`define RAM_META_HIER         `PD_MAIN_HIER.u_sram_ctrl_meta.u_prim_ram_1p_scr
 `define ROM_CTRL_HIER         `PD_MAIN_HIER.u_rom_ctrl
 `define RSTMGR_HIER           `PD_AON_HIER.u_rstmgr
 `define SPI_DEVICE_HIER       `PD_MAIN_HIER.u_spi_device
@@ -59,6 +60,7 @@
 `define ICACHE1_DATA_MEM_INST_HIER `ICACHE_WAY1_HIER.data_bank.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
 `define RAM_MAIN_MEM_INST_HIER     `RAM_MAIN_HIER.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
 `define RAM_RET_MEM_INST_HIER      `RAM_RET_HIER.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
+`define RAM_META_MEM_INST_HIER     `RAM_META_HIER.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
 `define OTBN_IMEM_MEM_INST_HIER    `OTBN_HIER.u_imem.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
 `define OTBN_DMEM_MEM_INST_HIER    `OTBN_HIER.u_dmem.u_prim_ram_1p_adv.gen_ram_inst[0].u_mem
 `define USBDEV_BUF_MEM_INST_HIER   `USBDEV_HIER.gen_no_stubbed_memory.u_memory_1p.gen_ram_inst[0].u_mem
@@ -71,6 +73,7 @@
 `define RAM_MAIN_MEM_TILE_HIER `RAM_MAIN_MEM_INST_HIER.`RAM_MAIN_MEM_TILE_PATH
 `define RAM_MAIN_MEM_PATH      `RAM_MAIN_MEM_BKDR_PATH(`RAM_MAIN_MEM_INST_HIER)
 `define RAM_RET_MEM_PATH       `DV_STRINGIFY(`RAM_RET_MEM_INST_HIER.`RAM_RET_MEM_TILE_PATH)
+`define RAM_META_MEM_PATH      `DV_STRINGIFY(`RAM_META_MEM_INST_HIER.`RAM_META_MEM_TILE_PATH)
 `define OTBN_IMEM_MEM_PATH     `DV_STRINGIFY(`OTBN_IMEM_MEM_INST_HIER.`OTBN_IMEM_MEM_TILE_PATH)
 // OTBN_DMEM may be bit-sliced across several macro instances (see mem_bkdr_util_hier.svh), so its
 // `path` needs the per-implementation `OTBN_DMEM_MEM_BKDR_PATH` macro-function, the same way

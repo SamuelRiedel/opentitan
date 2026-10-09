@@ -90,7 +90,11 @@ package chip_env_pkg;
     Otp,
     RamMain[16],
     RamRet[16],
-    Rom
+    Rom,
+    // The CHERIoT metadata SRAM is not on the system bus, so its backdoor has a system base address
+    // of 0 and claims the low addresses up to its size. Keep it after Rom: get_mem_from_addr
+    // returns the first memory that claims an address, and the ROM lies inside that range.
+    RamMeta
   } chip_mem_e;
 
   // On Earlgrey, we deal with 6 types of SW.

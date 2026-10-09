@@ -94,6 +94,11 @@ class chip_sw_base_vseq extends chip_base_vseq;
     cfg.mem_bkdr_util_h[RramInfo].clear_mem();
     cfg.mem_bkdr_util_h[RramData].clear_mem();
 
+    // Initialize the CHERIoT metadata SRAM to logical zeros with valid integrity and scrambling.
+    // CHERIoT does not require this, but tag updates are read-modify-writes, which would otherwise
+    // read X. Software could clear the tags at startup, but doing it here saves simulation time.
+    meta_sram_bkdr_clear();
+
     // Randomize retention memory.  This is done intentionally with wrong integrity
     // as early portions of ROM will initialize it to the correct value.
     // The randomization here is just to ensure we do not have x's in the memory.
@@ -185,6 +190,36 @@ class chip_sw_base_vseq extends chip_base_vseq;
       bit [sram_scrambler_pkg::SRAM_KEY_WIDTH-1:0] key = RndCnstSramCtrlRetSramKey,
       bit [sram_scrambler_pkg::SRAM_BLOCK_WIDTH-1:0] nonce = RndCnstSramCtrlRetSramNonce);
     _sram_bkdr_inject_ecc_error(addr, 0, key, nonce);
+  endfunction
+
+  // Writes one logical 32-bit word of the CHERIoT metadata SRAM through the backdoor. Unlike main
+  // and retention SRAM, the metadata SRAM has data scrambling enabled but address scrambling
+  // disabled. So the physical row address is the logical one, but the whole inverted-SECDED
+  // codeword must still be encrypted with the metadata SRAM key, nonce and logical address.
+  virtual function void meta_sram_bkdr_write32(
+      bit [bus_params_pkg::BUS_AW-1:0] addr,
+      bit [31:0] data,
+      bit [sram_scrambler_pkg::SRAM_KEY_WIDTH-1:0]   key = RndCnstSramCtrlMetaSramKey,
+      bit [sram_scrambler_pkg::SRAM_BLOCK_WIDTH-1:0] nonce = RndCnstSramCtrlMetaSramNonce);
+    sram_ctrl_bkdr_util meta_sram;
+    bit [38:0] data_scr;
+
+    `downcast(meta_sram, cfg.mem_bkdr_util_h[RamMeta])
+    data_scr = meta_sram.get_sram_encrypt32_intg_data(
+        .addr(addr), .data(data), .key(key), .nonce(nonce), .extra_addr_bits(0));
+    meta_sram.write39integ(addr, data_scr);
+  endfunction
+
+  // Sets every logical word of the CHERIoT metadata SRAM to zero, with valid inverted SECDED and
+  // scrambling.
+  virtual function void meta_sram_bkdr_clear(
+      bit [sram_scrambler_pkg::SRAM_KEY_WIDTH-1:0]   key = RndCnstSramCtrlMetaSramKey,
+      bit [sram_scrambler_pkg::SRAM_BLOCK_WIDTH-1:0] nonce = RndCnstSramCtrlMetaSramNonce);
+    int size_bytes = cfg.mem_bkdr_util_h[RamMeta].get_size_bytes();
+
+    for (int addr = 0; addr < size_bytes; addr += 4) begin
+      meta_sram_bkdr_write32(addr, 32'h0, key, nonce);
+    end
   endfunction
 
   // This gets some parameters based on the type of sram. Notice it will always return a
