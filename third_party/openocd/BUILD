@@ -21,7 +21,9 @@ genrule(
     outs = ["openocd.sh"],
     cmd = """
     echo '#!/bin/bash' > $@
-    echo './$(execpath :openocd_bin) "$$@"' >> $@
+    echo 'SCRIPT_DIR="$$(cd "$$(dirname "$${BASH_SOURCE[0]}")" && pwd)"' >> $@
+    echo 'EXECROOT="$${SCRIPT_DIR%%/bazel-out/*}"' >> $@
+    echo '"$$EXECROOT/$(execpath :openocd_bin)" "$$@"' >> $@
     """,
     executable = True,
     tools = [":openocd_bin"],
