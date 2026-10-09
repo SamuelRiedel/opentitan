@@ -324,6 +324,66 @@ class jtag_rv_debugger extends uvm_object;
     if (aarpostincrement_supported && (value_q.size() > 1)) write_abstract_cmd_auto();
   endtask
 
+  // Reads a CPU register with a single 64-bit (aarsize = 3) Access Register command.
+  //
+  // On a 32-bit hart this is only meaningful where the debug module supports it, for example a
+  // CHERIoT hart, where it transfers a whole capability: the address in the lower word and the
+  // metadata in the upper one. Elsewhere the debug module rejects it, which is returned as status.
+  //
+  // regno: The CPU register number. For a CHERIoT debug module, a regno below 0x1000 names a
+  // Special Capability Register by its low five bits.
+  // value: {data1, data0}. Only valid if status is AbstractCmdErrNone.
+  virtual task abstract_cmd_reg_read64(input abstract_cmd_regno_t regno,
+                                       output logic [63:0] value,
+                                       output abstract_cmd_err_e status);
+    uvm_reg_data_t rw_data = '0;
+    uvm_reg_data_t data0, data1;
+    abstract_cmd_reg_access_t cmd = '0;
+
+    cmd.aarsize = 3;
+    cmd.transfer = 1;
+    cmd.regno = regno;
+    rw_data = csr_utils_pkg::get_csr_val_with_updated_field(ral.command.cmdtype, rw_data,
+                                                            AbstractCmdRegAccess);
+    rw_data = csr_utils_pkg::get_csr_val_with_updated_field(ral.command.control, rw_data, cmd);
+    csr_wr(.ptr(ral.command), .value(rw_data), .blocking(1), .predict(predict_dmi_writes));
+    abstract_cmd_busy_wait(.status(status), .cmderr_clear(1));
+    value = 'x;
+    // Let the caller handle error cases.
+    if (status != AbstractCmdErrNone) return;
+    csr_rd(.ptr(ral.abstractdata[0]), .value(data0), .blocking(1));
+    csr_rd(.ptr(ral.abstractdata[1]), .value(data1), .blocking(1));
+    value = {data1[31:0], data0[31:0]};
+    `uvm_info(`gfn, $sformatf("Read CPU register 0x%0h (64 bits): 0x%016h", regno, value),
+              UVM_MEDIUM)
+  endtask
+
+  // Writes a CPU register with a single 64-bit (aarsize = 3) Access Register command.
+  //
+  // See abstract_cmd_reg_read64. value is written as {data1, data0}.
+  virtual task abstract_cmd_reg_write64(input abstract_cmd_regno_t regno,
+                                        input logic [63:0] value,
+                                        output abstract_cmd_err_e status);
+    uvm_reg_data_t rw_data = '0;
+    abstract_cmd_reg_access_t cmd = '0;
+
+    csr_wr(.ptr(ral.abstractdata[0]), .value(value[31:0]), .blocking(1),
+           .predict(predict_dmi_writes));
+    csr_wr(.ptr(ral.abstractdata[1]), .value(value[63:32]), .blocking(1),
+           .predict(predict_dmi_writes));
+    cmd.aarsize = 3;
+    cmd.transfer = 1;
+    cmd.write = 1;
+    cmd.regno = regno;
+    rw_data = csr_utils_pkg::get_csr_val_with_updated_field(ral.command.cmdtype, rw_data,
+                                                            AbstractCmdRegAccess);
+    rw_data = csr_utils_pkg::get_csr_val_with_updated_field(ral.command.control, rw_data, cmd);
+    csr_wr(.ptr(ral.command), .value(rw_data), .blocking(1), .predict(predict_dmi_writes));
+    abstract_cmd_busy_wait(.status(status), .cmderr_clear(1));
+    `uvm_info(`gfn, $sformatf("Wrote 0x%016h to CPU register 0x%0h (64 bits)", value, regno),
+              UVM_MEDIUM)
+  endtask
+
   // Reads (a) system memory location(s) via an abstract command.
   //
   // The system memory address space can be accessed either via `AbstractCmdMemAccess` abstract
