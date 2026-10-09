@@ -823,11 +823,17 @@ opentitan_test(
 # the core to CHERIoT. The host harness drives rv_dm over raw DMI; see
 # `rv_dm_cheriot_caps.S` for the protocol between the two. The test ROM
 # environment boots with the RMA OTP image, so the debug module is enabled.
+#
+# The Verilator variant has no host harness: it is for driving the same
+# protocol by hand from GDB, through OpenOCD and the simulation's DMI port. It
+# waits at each rendezvous until something sets `a5`, so on its own it only
+# ends at the timeout.
 opentitan_test(
     name = "rv_dm_cheriot_caps",
     srcs = ["rv_dm_cheriot_caps.S"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_verilator": None,
     },
     fpga = fpga_params(
         needs_jtag = True,
@@ -837,6 +843,12 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_dm:cheriot_caps",
     ),
     platform = CHERIOT_PLATFORM,
+    verilator = verilator_params(
+        exit_failure = "FAIL |[RC]TRAP ",
+        exit_success = "CHERIOT DEBUG PASS\r\n",
+        tags = ["manual"],
+        timeout = "eternal",
+    ),
     deps = CHERIOT_SMOKETEST_DEPS,
 )
 
