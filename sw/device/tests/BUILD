@@ -831,8 +831,12 @@ opentitan_test(
 opentitan_test(
     name = "rv_dm_cheriot_caps",
     srcs = ["rv_dm_cheriot_caps.S"],
+    dv = dv_params(
+        defines = ["DV_TEST_STATUS"],
+    ),
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
     fpga = fpga_params(
