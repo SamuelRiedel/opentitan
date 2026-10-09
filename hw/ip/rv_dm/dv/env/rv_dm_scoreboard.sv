@@ -400,11 +400,17 @@ class rv_dm_scoreboard extends cip_base_scoreboard #(
       // accessing an address that lies above the top of our model of the debug memory. The
       // dm_mem implementation ignores that sort of access.
       //
-      // Check that the response is not an error and a read has a d_data response of 0
-      if (item.d_error || (!is_write && item.d_data != 0)) begin
+      // The debug ROM is the exception. It is a window rather than a set of registers, so it has
+      // no CSR either, and its contents depend on the CHERIoT mode, so we don't model them here:
+      // sequences that read the ROM compare it against the instantiated ROM instead.
+      bit in_rom = ral_model.get_default_map().get_mem_by_offset(csr_addr) == blk.rom;
+
+      // Check that the response is not an error and that a read outside the ROM has a d_data
+      // response of 0.
+      if (item.d_error || (!is_write && !in_rom && item.d_data != 0)) begin
         string problems[$];
         if (item.d_error) problems.push_back("Expected d_error=0 but it was 1.");
-        if (!is_write && item.d_data != 0) begin
+        if (!is_write && !in_rom && item.d_data != 0) begin
           problems.push_back($sformatf("Expected read d_data=0, but it was 0x%0h", item.d_data));
         end
 
