@@ -34,3 +34,7 @@
 `include "rv_dm_buffered_enable_vseq.sv"
 `include "rv_dm_sparse_lc_gate_fsm_vseq.sv"
 `include "rv_dm_scanmode_vseq.sv"
+`include "rv_dm_cheriot_aarsize_vseq.sv"
+`include "rv_dm_cheriot_rom_read_access_vseq.sv"
+`include "rv_dm_cheriot_abstractcmd_status_vseq.sv"
+`include "rv_dm_cheriot_halt_resume_whereto_vseq.sv"
