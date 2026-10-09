@@ -185,7 +185,10 @@ class jtag_rv_debugger extends uvm_object;
     )
     status = abstract_cmd_err_e'(dv_base_reg_pkg::get_field_val(ral.abstractcs.cmderr, data));
     if (status != AbstractCmdErrNone && cmderr_clear) begin
-      csr_wr(.ptr(ral.abstractcs.cmderr), .value(1), .blocking(1), .predict(predict_dmi_writes));
+      // cmderr is write-1-to-clear per bit, so all three bits have to be written. Writing 1 only
+      // clears cmderr values with bit 0 set, and the debug module ignores new abstract commands
+      // while cmderr is non-zero.
+      csr_wr(.ptr(ral.abstractcs.cmderr), .value(7), .blocking(1), .predict(predict_dmi_writes));
     end
     `uvm_info(`gfn, "Abstract command completed", UVM_MEDIUM)
   endtask
