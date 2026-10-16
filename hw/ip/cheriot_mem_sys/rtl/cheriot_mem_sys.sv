@@ -22,7 +22,10 @@ module cheriot_mem_sys
   parameter addr_t                MetaSramBaseAddr = 'h1100_0000,
   parameter int unsigned          MemSizeRevbm     = 3072,
   parameter logic [NumAlerts-1:0] AlertAsyncOn     = {NumAlerts{1'b1}},
-  parameter int unsigned          AlertSkewCycles  = 1
+  parameter int unsigned          AlertSkewCycles  = 1,
+  // Register the response path of the meta SRAM (tag RMW and TRVK revbm lookup). Adds +1 cycle
+  // latency on every access that waits for a meta response. See timing scenario D.
+  parameter bit                   MetaRspReg       = 1'b0
 ) (
 
   input  logic clk_i,
@@ -170,6 +173,13 @@ module cheriot_mem_sys
   tlul_pkg::tl_h2d_t tags_tl_h2d;
   tlul_pkg::tl_d2h_t tags_tl_d2h;
 
+  // Intermediate signals for MetaRspReg registered response stage
+  tlul_pkg::tl_d2h_t rmw_tl_d2h_pre;    // RMW filter tl_h_o before optional register
+  logic              rmw_tag_d2h_pre;    // RMW filter tag_h_o before optional register
+  tlul_pkg::tl_h2d_t rmw_tl_h2d_to_filter; // Request input to RMW filter
+  tlul_pkg::tl_h2d_t corerevbm_tl_h2d_int; // TRVK access check request input
+  tlul_pkg::tl_d2h_t corerevbm_tl_d2h_int; // TRVK access check response output
+
   tlul_pkg::tl_h2d_t tbre_revbm_tl_h2d;
   tlul_pkg::tl_d2h_t tbre_revbm_tl_d2h;
 
@@ -239,8 +249,8 @@ module cheriot_mem_sys
     .clk_i,
     .rst_ni,
     .cheriot_ena_i,
-    .tl_h_i(corerevbm_tl_i),
-    .tl_h_o(corerevbm_tl_o),
+    .tl_h_i(corerevbm_tl_h2d_int),
+    .tl_h_o(corerevbm_tl_d2h_int),
     .tl_d_o(meta_mux_in_tl_h2d[32'd0]),
     .tl_d_i(meta_mux_in_tl_d2h[32'd0])
   );
@@ -441,11 +451,11 @@ module cheriot_mem_sys
   ) u_cheriot_rmw_filter (
     .clk_i,
     .rst_ni,
-    .tl_h_i           (rmw_tl_h2d),
+    .tl_h_i           (rmw_tl_h2d_to_filter),
     .tag_h_i          (rmw_tag_h2d),
     .bit_sel_h_i      (rmw_bit_sel),
-    .tl_h_o           (rmw_tl_d2h),
-    .tag_h_o          (rmw_tag_d2h),
+    .tl_h_o           (rmw_tl_d2h_pre),
+    .tag_h_o          (rmw_tag_d2h_pre),
     .tl_d_o           (tags_tl_h2d),
     .tl_d_i           (tags_tl_d2h),
     .data_intg_error_o(rmw_data_intg_err),
@@ -456,6 +466,61 @@ module cheriot_mem_sys
   assign cheriot_fatal_error.meta_sram_data_intg = rmw_data_intg_err;
   assign cheriot_fatal_error.meta_sram_intg      = rmw_rsp_intg_err;
   assign cheriot_fatal_error.rmw_error           = rmw_dev_err;
+
+  /////////////////////////////
+  // Meta Response Registers //
+  /////////////////////////////
+
+  // When MetaRspReg is set, insert a registered response stage on the meta SRAM response paths.
+  // This cuts the timing path from meta SRAM read data to the core's data_rvalid (scenario D/E).
+  if (MetaRspReg) begin : gen_meta_rsp_reg
+    // FIFO 1: between the RMW filter and the socket, buffering tag RMW responses.
+    // ReqPass=1 keeps the request path combinational; RspPass=0 registers responses.
+    // spare_rsp carries the tag sideband in lockstep with d_valid.
+    tlul_fifo_sync #(
+      .ReqPass  (1'b1),
+      .ReqDepth (0),
+      .RspPass  (1'b0),
+      .RspDepth (2),
+      .SpareRspW(1)
+    ) u_rmw_rsp_fifo (
+      .clk_i,
+      .rst_ni,
+      .tl_h_i     (rmw_tl_h2d),
+      .tl_h_o     (rmw_tl_d2h),
+      .tl_d_o     (rmw_tl_h2d_to_filter),
+      .tl_d_i     (rmw_tl_d2h_pre),
+      .spare_req_i(1'b0),
+      .spare_req_o(),
+      .spare_rsp_i(rmw_tag_d2h_pre),
+      .spare_rsp_o(rmw_tag_d2h)
+    );
+
+    // FIFO 2: between the TRVK access check and the core revbm port, buffering revbm responses.
+    tlul_fifo_sync #(
+      .ReqPass  (1'b1),
+      .ReqDepth (0),
+      .RspPass  (1'b0),
+      .RspDepth (2)
+    ) u_trvk_rsp_fifo (
+      .clk_i,
+      .rst_ni,
+      .tl_h_i     (corerevbm_tl_i),
+      .tl_h_o     (corerevbm_tl_o),
+      .tl_d_o     (corerevbm_tl_h2d_int),
+      .tl_d_i     (corerevbm_tl_d2h_int),
+      .spare_req_i(1'b0),
+      .spare_req_o(),
+      .spare_rsp_i(1'b0),
+      .spare_rsp_o()
+    );
+  end else begin : gen_no_meta_rsp_reg
+    assign rmw_tl_h2d_to_filter = rmw_tl_h2d;
+    assign rmw_tl_d2h           = rmw_tl_d2h_pre;
+    assign rmw_tag_d2h          = rmw_tag_d2h_pre;
+    assign corerevbm_tl_h2d_int = corerevbm_tl_i;
+    assign corerevbm_tl_o       = corerevbm_tl_d2h_int;
+  end
 
   ///////////////////
   // Access Checks //
