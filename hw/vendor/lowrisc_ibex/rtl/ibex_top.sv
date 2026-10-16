@@ -60,7 +60,9 @@ module ibex_top import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   // 0 indicates this field is not implemented. Ibex implementers may wish to indicate an
   // RTL/netlist version here using their own unique encoding (e.g. 32 bits of the git hash of the
   // implemented commit).
-  parameter logic [31:0]            CsrMimpId                    = 32'b0
+  parameter logic [31:0]            CsrMimpId                    = 32'b0,
+  // Register the TRVK revocation bitmap lookup decision. See ibex_trvk.sv for details.
+  parameter bit                     RegisterTRVKDecision         = 1'b0
 ) (
   // Clock and Reset
   input  logic                                                         clk_i,
@@ -1277,7 +1279,8 @@ module ibex_top import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
       .NumOutstanding(MaxOutstandingDSideAccesses),
       .MemECC(MemECC),
       .RevBitmapAddrWidth(CheriotRevBitmapAddrWidth),
-      .RevBitmapBaseAddr(CheriotRevBitmapBaseAddr)
+      .RevBitmapBaseAddr(CheriotRevBitmapBaseAddr),
+      .RegisterTRVKDecision(RegisterTRVKDecision)
     ) i_ibex_trvk (
       .clk_i                  (clk),
       .rst_ni                 (rst_ni),

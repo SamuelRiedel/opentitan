@@ -59,7 +59,8 @@ module rv_core_ibex
   parameter logic [31:0]                    CsrMimpId                   = 32'b0,
   parameter int unsigned                    CheriotRevBitmapAddrWidth   = 32'd11,
   parameter int unsigned                    CheriotRevBitmapBaseAddr    = 32'h0,
-  parameter int unsigned                    CheriotTrvkHeapBaseAddr     = 32'h0
+  parameter int unsigned                    CheriotTrvkHeapBaseAddr     = 32'h0,
+  parameter bit                             RegisterTRVKDecision        = 1'b0
 ) (
   // Clock and Reset
   input  logic        clk_i,
@@ -489,6 +490,7 @@ module rv_core_ibex
     .PMPRstMsecCfg               ( PMPRstMsecCfg            ),
     .CheriotRevBitmapAddrWidth   ( CheriotRevBitmapAddrWidth),
     .CheriotRevBitmapBaseAddr    ( CheriotRevBitmapBaseAddr ),
+    .RegisterTRVKDecision        ( RegisterTRVKDecision     ),
     .RV32E                       ( RV32E                    ),
     .RV32M                       ( RV32M                    ),
     .RV32B                       ( RV32B                    ),

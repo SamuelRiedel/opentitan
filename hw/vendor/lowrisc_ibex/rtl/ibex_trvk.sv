@@ -8,13 +8,17 @@
 // uninterrupted 32-bit responses from a single, in-order requester.
 module ibex_trvk #(
   // The number of outstanding transaction the IP supports
-  parameter int unsigned NumOutstanding     = 32'd4,
+  parameter int unsigned NumOutstanding        = 32'd4,
   // The width of the meta memory byte address space used to store the revocation bits
-  parameter int unsigned RevBitmapAddrWidth = 32'd11,
+  parameter int unsigned RevBitmapAddrWidth    = 32'd11,
   // The base byte address of the meta SRAM holding the revocation bitmap
-  parameter int unsigned RevBitmapBaseAddr  = 32'h0000_0000,
+  parameter int unsigned RevBitmapBaseAddr     = 32'h0000_0000,
   // Enable ECC checking on the revocation bitmap memory port
-  parameter bit          MemECC             = 1'b1
+  parameter bit          MemECC                = 1'b1,
+  // Register the revocation bitmap lookup decision for the second word of a capability load.
+  // upstream_rvalid_o and revbm_req_o no longer depend combinationally on downstream response
+  // data. Adds +1 cycle latency on tagged capability loads only. See timing scenario T (B/E).
+  parameter bit          RegisterTRVKDecision  = 1'b0
 )(
   input  logic clk_i,
   input  logic rst_ni,
@@ -144,6 +148,10 @@ module ibex_trvk #(
   logic revbm_outstanding_q;
   logic revbm_revoked;
 
+  // Registered TRVK decision (RegisterTRVKDecision parameter)
+  logic        revbm_req_required_mux; // drives join sel and revbm_req_o
+  revbm_addr_t revbm_addr_mux;
+
   // Bitmap response ECC signals
   logic [1:0] revbm_rsp_data_intg_error;
 
@@ -171,9 +179,9 @@ module ibex_trvk #(
   stream_join_dynamic #(
     .N_INP(32'd2)
   ) u_stream_join_dynamic_ds2us (
-    .inp_valid_i({revbm_rvalid_i,     downstream_rsp_out_valid}),
-    .inp_ready_o({revbm_rsp_ready,    downstream_rsp_out_ready}),
-    .sel_i      ({revbm_req_required, 1'b1                    }),
+    .inp_valid_i({revbm_rvalid_i,         downstream_rsp_out_valid}),
+    .inp_ready_o({revbm_rsp_ready,        downstream_rsp_out_ready}),
+    .sel_i      ({revbm_req_required_mux, 1'b1                    }),
     .oup_valid_o(upstream_rvalid_o),
     .oup_ready_i(1'b1)
   );
@@ -191,7 +199,7 @@ module ibex_trvk #(
   // Forward upstream to downstream CHERIoT tag without changes
   assign downstream_tag_o = upstream_tag_i;
 
-  // Tag handling; always return tag except if we do a revocation bitmap lookup
+  // Tag handling; always return tag except if we do a revocation bitmap lookup.
   assign upstream_tag_o = (revbm_rvalid_i ? !revbm_revoked : 1'b1) & downstream_rsp_out.tag;
 
   // 64-bit alignment store
@@ -354,10 +362,26 @@ module ibex_trvk #(
                               misalign_flag_out_valid  && // The latched alignment bits are valid
                               !revbm_out_of_range;        // We hit the heap range
 
-  // Assemble read-only request
-  assign revbm_req_o  = revbm_req_required && !revbm_outstanding_q;
+  // When RegisterTRVKDecision: break the combinational path from downstream response data to
+  // upstream_rvalid_o and revbm_req_o. Instead of using the second-word tag (combinational),
+  // use ptr_storage_valid_q (first-word tag, already registered one cycle earlier) to decide
+  // whether a revbm lookup is needed. This is conservative: a lookup is initiated whenever the
+  // first word had a tag, even for sealing caps or out-of-range pointers (fail-closed).
+  if (RegisterTRVKDecision) begin : gen_trvk_decision_reg
+    assign revbm_req_required_mux = ptr_storage_valid_q     &&
+                                    downstream_rsp_out_valid &&
+                                    misalign_flag_out        &&
+                                    misalign_flag_out_valid;
+    assign revbm_addr_mux         = revbm_addr;
+  end else begin : gen_no_trvk_decision_reg
+    assign revbm_req_required_mux = revbm_req_required;
+    assign revbm_addr_mux         = revbm_addr;
+  end
+
+  // Assemble read-only request using (optionally registered) decision
+  assign revbm_req_o  = revbm_req_required_mux && !revbm_outstanding_q;
   assign revbm_addr_o = RevBitmapBaseAddr +
-                         {{32 - RevBitmapWordAddrWidth - 2{1'b0}}, revbm_addr, 2'b00};
+                         {{32 - RevBitmapWordAddrWidth - 2{1'b0}}, revbm_addr_mux, 2'b00};
 
   // Is the current capability marked as revoked?
   assign revbm_revoked = revbm_rdata_i[revbm_bit_select] || revbm_err_i ||

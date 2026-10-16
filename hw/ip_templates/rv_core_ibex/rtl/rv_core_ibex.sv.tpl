@@ -67,7 +67,8 @@ module ${module_instance_name}
 % if cheriot_available:
   parameter int unsigned                    CheriotRevBitmapAddrWidth   = 32'd11,
   parameter int unsigned                    CheriotRevBitmapBaseAddr    = 32'h0,
-  parameter int unsigned                    CheriotTrvkHeapBaseAddr     = 32'h0
+  parameter int unsigned                    CheriotTrvkHeapBaseAddr     = 32'h0,
+  parameter bit                             RegisterTRVKDecision        = 1'b0
 % endif
 ) (
   // Clock and Reset
@@ -527,6 +528,7 @@ module ${module_instance_name}
 % if cheriot_available:
     .CheriotRevBitmapAddrWidth   ( CheriotRevBitmapAddrWidth),
     .CheriotRevBitmapBaseAddr    ( CheriotRevBitmapBaseAddr ),
+    .RegisterTRVKDecision        ( RegisterTRVKDecision     ),
 % endif
     .RV32E                       ( RV32E                    ),
     .RV32M                       ( RV32M                    ),
