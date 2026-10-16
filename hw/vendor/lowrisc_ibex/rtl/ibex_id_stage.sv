@@ -26,7 +26,8 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   parameter bit               BranchTargetALU = 0,
   parameter bit               WritebackStage  = 0,
   parameter bit               BranchPredictor = 0,
-  parameter bit               MemECC          = 1'b0,
+  parameter bit               MemECC             = 1'b0,
+  parameter bit               ImpreciseBusErrors = 1'b0,
   parameter ibex_pkg::base_isa_e BaseIsa      = ibex_pkg::BaseIsaRV32IorCHERIoT
 ) (
   input  logic                      clk_i,
@@ -612,10 +613,11 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   assign mem_resp_intg_err = lsu_load_resp_intg_err_i | lsu_store_resp_intg_err_i;
 
   ibex_controller #(
-    .BaseIsa        (BaseIsa),
-    .WritebackStage (WritebackStage),
-    .BranchPredictor(BranchPredictor),
-    .MemECC(MemECC)
+    .BaseIsa           (BaseIsa),
+    .WritebackStage    (WritebackStage),
+    .BranchPredictor   (BranchPredictor),
+    .MemECC            (MemECC),
+    .ImpreciseBusErrors(ImpreciseBusErrors)
   ) controller_i (
     .clk_i           (clk_i),
     .rst_ni          (rst_ni),

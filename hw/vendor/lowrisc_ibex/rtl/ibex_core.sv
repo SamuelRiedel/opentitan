@@ -48,6 +48,7 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   parameter int unsigned            RegFileDataWidth            = 32,
   parameter int unsigned            RegFileCapEccWidth          = REGCAP_W,
   parameter bit                     MemECC                      = 1'b0,
+  parameter bit                     ImpreciseBusErrors          = 1'b0,
   parameter int unsigned            MemDataWidth                = MemECC ? 32 + 7 : 32,
   parameter int unsigned            DmBaseAddr                  = 32'h1A110000,
   parameter int unsigned            DmAddrMask                  = 32'h00000FFF,
@@ -669,8 +670,9 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
     .DataIndTiming  (DataIndTiming),
     .WritebackStage (WritebackStage),
     .BranchPredictor(BranchPredictor),
-    .MemECC         (MemECC),
-    .BaseIsa        (BaseIsa)
+    .MemECC            (MemECC),
+    .ImpreciseBusErrors(ImpreciseBusErrors),
+    .BaseIsa           (BaseIsa)
   ) id_stage_i (
     .clk_i (clk_i),
     .rst_ni(rst_ni),

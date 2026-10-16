@@ -63,7 +63,8 @@ module ${module_instance_name}
 % endif
   parameter logic [tlul_pkg::RsvdWidth-1:0] TlulHostUserRsvdBits        = 0,
   parameter logic [31:0]                    CsrMvendorId                = 32'b0,
-  parameter logic [31:0]                    CsrMimpId                   = 32'b0${"," if cheriot_available else ""}
+  parameter logic [31:0]                    CsrMimpId                   = 32'b0,
+  parameter bit                             ImpreciseBusErrors          = 1'b0${"," if cheriot_available else ""}
 % if cheriot_available:
   parameter int unsigned                    CheriotRevBitmapAddrWidth   = 32'd11,
   parameter int unsigned                    CheriotRevBitmapBaseAddr    = 32'h0,
@@ -568,7 +569,8 @@ module ${module_instance_name}
     .DmHaltAddr                  ( DmHaltAddr               ),
     .DmExceptionAddr             ( DmExceptionAddr          ),
     .CsrMvendorId                ( CsrMvendorId             ),
-    .CsrMimpId                   ( CsrMimpId                )
+    .CsrMimpId                   ( CsrMimpId                ),
+    .ImpreciseBusErrors          ( ImpreciseBusErrors       )
   ) u_core (
     .clk_i              (ibex_top_clk_i),
     .rst_ni,

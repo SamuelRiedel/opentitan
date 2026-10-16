@@ -12,10 +12,13 @@
 `include "dv_fcov_macros.svh"
 
 module ibex_controller import ibex_pkg::*; #(
-  parameter base_isa_e BaseIsa  = BaseIsaRV32I,
-  parameter bit WritebackStage  = 1'b0,
-  parameter bit BranchPredictor = 1'b0,
-  parameter bit MemECC          = 1'b0
+  parameter base_isa_e BaseIsa         = BaseIsaRV32I,
+  parameter bit        WritebackStage  = 1'b0,
+  parameter bit        BranchPredictor = 1'b0,
+  parameter bit        MemECC          = 1'b0,
+  // Make data bus errors imprecise: load_err_i/store_err_i are excluded from wb_exception_o.
+  // Errors still take effect one cycle later via load_err_q/store_err_q. See timing scenario C.
+  parameter bit        ImpreciseBusErrors = 1'b0
  ) (
   input  logic                  clk_i,
   input  logic                  rst_ni,
@@ -334,8 +337,11 @@ module ibex_controller import ibex_pkg::*; #(
       end
     end
 
-    // Instruction in writeback is generating an exception so instruction in ID must not execute
-    assign wb_exception_o = load_err_q | store_err_q | load_err_i | store_err_i
+    // Instruction in writeback is generating an exception so instruction in ID must not execute.
+    // With ImpreciseBusErrors the _i (combinational) terms are dropped; errors are seen one cycle
+    // later via _q, breaking the data_err_i -> data_req_o combinational path.
+    assign wb_exception_o = load_err_q | store_err_q
+                          | (ImpreciseBusErrors ? 1'b0 : (load_err_i | store_err_i))
                           | ((cheriot_enable_i == IbexMuBiOn) & cheriot_wb_err_i);
   end else begin : g_no_wb_exceptions
     always_comb begin

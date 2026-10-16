@@ -62,7 +62,10 @@ module ibex_top import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   // implemented commit).
   parameter logic [31:0]            CsrMimpId                    = 32'b0,
   // Register the TRVK revocation bitmap lookup decision. See ibex_trvk.sv for details.
-  parameter bit                     RegisterTRVKDecision         = 1'b0
+  parameter bit                     RegisterTRVKDecision         = 1'b0,
+  // Make data bus errors imprecise: drop load_err_i/store_err_i from wb_exception_o so that
+  // data_err_i does not gate data_req_o combinationally. See timing scenario C.
+  parameter bit                     ImpreciseBusErrors           = 1'b0
 ) (
   // Clock and Reset
   input  logic                                                         clk_i,
@@ -401,6 +404,7 @@ module ibex_top import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
     .RegFileDataWidth     (RegFileDataWidth),
     .RegFileCapEccWidth   (REGCAP_W),
     .MemECC               (MemECC),
+    .ImpreciseBusErrors   (ImpreciseBusErrors),
     .MemDataWidth         (MemDataWidth),
     .DmBaseAddr           (DmBaseAddr),
     .DmAddrMask           (DmAddrMask),

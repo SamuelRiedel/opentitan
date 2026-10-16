@@ -57,6 +57,7 @@ module rv_core_ibex
   parameter logic [tlul_pkg::RsvdWidth-1:0] TlulHostUserRsvdBits        = 0,
   parameter logic [31:0]                    CsrMvendorId                = 32'b0,
   parameter logic [31:0]                    CsrMimpId                   = 32'b0,
+  parameter bit                             ImpreciseBusErrors          = 1'b0,
   parameter int unsigned                    CheriotRevBitmapAddrWidth   = 32'd11,
   parameter int unsigned                    CheriotRevBitmapBaseAddr    = 32'h0,
   parameter int unsigned                    CheriotTrvkHeapBaseAddr     = 32'h0,
@@ -529,7 +530,8 @@ module rv_core_ibex
     .DmHaltAddr                  ( DmHaltAddr               ),
     .DmExceptionAddr             ( DmExceptionAddr          ),
     .CsrMvendorId                ( CsrMvendorId             ),
-    .CsrMimpId                   ( CsrMimpId                )
+    .CsrMimpId                   ( CsrMimpId                ),
+    .ImpreciseBusErrors          ( ImpreciseBusErrors       )
   ) u_core (
     .clk_i              (ibex_top_clk_i),
     .rst_ni,
