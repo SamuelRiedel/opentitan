@@ -40,6 +40,7 @@ module ibex_cheriot_ex import ibex_cheriot_pkg::*; import ibex_pkg::*; #(
 
   // Interface to ID stage control logic
   input  logic                   cheriot_exec_id_i,
+  input  logic                   cheriot_exec_id_spec_i, // speculative, only for branch_req_spec_o
   input  logic                   instr_first_cycle_i,   // 1st exec cycle allowing lsu_req
 
   // inputs from decoder
@@ -238,9 +239,10 @@ module ibex_cheriot_ex import ibex_cheriot_pkg::*; import ibex_pkg::*; #(
   // gate these signals with cheriot_exec_id to make sure they are only active when needed
   // (only 1 cycle in all cases other than cheriot_rf_we)
   // -- safest approach and probably the right thing to do in case there is a wb_exception
+  // Only the fetch redirect is speculative. Architectural effects use cheriot_exec_id_i.
   assign cheriot_rf_we_o   = cheriot_rf_we_raw & cheriot_exec_id_i;
   assign branch_req_o      = branch_req_raw & cheriot_exec_id_i;
-  assign branch_req_spec_o = branch_req_spec_raw & cheriot_exec_id_i;
+  assign branch_req_spec_o = branch_req_spec_raw & cheriot_exec_id_spec_i;
   assign csr_set_mie_o     = csr_set_mie_raw & cheriot_exec_id_i;
   assign csr_clr_mie_o     = csr_clr_mie_raw & cheriot_exec_id_i;
   assign csr_op_en_o       = csr_op_en_raw & cheriot_exec_id_i;

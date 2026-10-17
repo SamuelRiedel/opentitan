@@ -203,6 +203,7 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
 
   // cheriot signals
   output logic                      cheriot_exec_id_o,
+  output logic                      cheriot_exec_id_spec_o,
   output logic                      instr_is_cheriot_id_o,
   output logic                      instr_is_rv32lsu_id_o,
   output logic [11:0]               cheriot_imm12_o,
@@ -251,6 +252,8 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   logic        jump_in_dec;
   logic        jump_set_dec;
   logic        jump_set, jump_set_raw;
+  logic        cheriot_branch_set;
+  logic        cheriot_jump_pending;
 
   logic        instr_first_cycle;
   logic        instr_executing_spec;
@@ -719,8 +722,9 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     .cheriot_ex_err_info_i   (cheriot_ex_err_info_i),
     .cheriot_wb_err_i        (cheriot_wb_err_i),
     .cheriot_wb_err_info_i   (cheriot_wb_err_info_i),
-    .cheriot_branch_req_i    (cheriot_branch_req_i),
-    .cheriot_branch_target_i (cheriot_branch_target_i)
+    .cheriot_branch_req_i    (cheriot_branch_set),
+    .cheriot_branch_target_i (cheriot_branch_target_i),
+    .cheriot_jump_pending_i  (cheriot_jump_pending)
   );
 
   assign multdiv_en_dec   = mult_en_dec | div_en_dec;
@@ -789,9 +793,9 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
 
   end
 
-  // Track whether the current instruction in ID/EX has done a branch or jump set.
-  assign branch_jump_set_done_d = (branch_set_raw | jump_set_raw | branch_jump_set_done_q) &
-    ~instr_valid_clear_o;
+  // Track one-shot branch, jump, and speculative CHERIoT redirect requests.
+  assign branch_jump_set_done_d = (branch_set_raw | jump_set_raw | cheriot_branch_req_i |
+                                   branch_jump_set_done_q) & ~instr_valid_clear_o;
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -808,8 +812,13 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   // completing until it is certain the outstanding access hasn't seen a memory error. This logic
   // ensures only the first cycle of a branch or jump set is sent to the controller to prevent
   // needless extra IF flushes and fetches.
-  assign jump_set        = jump_set_raw        & ~branch_jump_set_done_q;
-  assign branch_set      = branch_set_raw      & ~branch_jump_set_done_q;
+  assign jump_set           = jump_set_raw         & ~branch_jump_set_done_q;
+  assign branch_set         = branch_set_raw       & ~branch_jump_set_done_q;
+  assign cheriot_branch_set = cheriot_branch_req_i & ~branch_jump_set_done_q;
+
+  // Hold a redirected CJALR target until the PCC update completes.
+  assign cheriot_jump_pending = branch_jump_set_done_q & instr_valid_i &
+                                cheriot_operator_o.CJALR;
 
   // Branch condition is calculated in the first cycle and flopped for use in the second cycle
   // (only used in fixed time execution mode to determine branch destination).
@@ -840,6 +849,15 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   // designs ensures that this never happens for non-predicted branches.
   `ASSERT(NeverDoubleBranch, branch_set & ~instr_bp_taken_i |=> ~branch_set)
   `ASSERT(NeverDoubleJump, jump_set & ~instr_bp_taken_i |=> ~jump_set)
+  `ASSERT(NeverDoubleCheriotJump, cheriot_branch_set & ~instr_bp_taken_i |=> ~cheriot_branch_set)
+
+  // The CHERIoT jump request reaches the controller for at most one cycle per instruction.
+  `ASSERT(IbexCheriotBranchReqOnce,
+    cheriot_branch_set & ~instr_valid_clear_o |=> ~cheriot_branch_set)
+
+  // A CHERIoT jump that executes has sent its fetch redirect in this or an earlier cycle.
+  `ASSERT(IbexCheriotBranchReqSent, cheriot_exec_id_o & cheriot_branch_req_i |->
+    cheriot_branch_set | branch_jump_set_done_q)
 
   //////////////////////////////
   // Branch not-taken address //
@@ -1065,8 +1083,12 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
                                ~stall_ld_hz           &
                                ~outstanding_memory_access;
 
+    // CHERIoT-qualified speculative execution, used only for fetch redirects.
+    assign cheriot_exec_id_spec_o = (cheriot_enable_i == IbexMuBiOn) &
+                                    instr_is_legal_cheriot & instr_executing_spec;
 
     `ASSERT(IbexExecutingSpecIfExecuting, instr_executing |-> instr_executing_spec)
+    `ASSERT(IbexCheriotExecutingSpecIfExecuting, cheriot_exec_id_o |-> cheriot_exec_id_spec_o)
 
     `ASSERT(IbexStallIfValidInstrNotExecuting,
       instr_valid_i & ~instr_kill & ~instr_executing |-> stall_id)
@@ -1146,9 +1168,10 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     assign stall_ld_hz   = 1'b0;
 
     // Without writeback stage any valid instruction that hasn't seen an error will execute
-    assign instr_executing_spec = instr_valid_i & ~instr_fetch_err_i & controller_run;
-    assign instr_executing      = instr_executing_spec;
-    assign cheriot_exec_id_o    = (cheriot_enable_i == IbexMuBiOn) & instr_executing;
+    assign instr_executing_spec   = instr_valid_i & ~instr_fetch_err_i & controller_run;
+    assign instr_executing        = instr_executing_spec;
+    assign cheriot_exec_id_o      = (cheriot_enable_i == IbexMuBiOn) & instr_executing;
+    assign cheriot_exec_id_spec_o = cheriot_exec_id_o;
 
     `ASSERT(IbexStallIfValidInstrNotExecuting,
       instr_valid_i & ~instr_fetch_err_i & ~instr_executing & controller_run |-> stall_id)
@@ -1223,6 +1246,12 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
 
   `DV_FCOV_SIGNAL_GEN_IF(logic, rf_rd_wb_hz,
     (gen_stall_mem.rf_rd_a_hz | gen_stall_mem.rf_rd_b_hz) & instr_valid_i, WritebackStage)
+  // Speculative redirect with an outstanding writeback access.
+  `DV_FCOV_SIGNAL_GEN_IF(logic, cheriot_spec_jump_mem_outstanding,
+    cheriot_branch_set & gen_stall_mem.outstanding_memory_access, WritebackStage)
+  // Writeback exception after a speculative redirect.
+  `DV_FCOV_SIGNAL(logic, cheriot_spec_jump_wb_exception,
+    (cheriot_branch_set | (branch_jump_set_done_q & instr_is_cheriot_id_o)) & wb_exception)
   `DV_FCOV_SIGNAL(logic, branch_taken,
     instr_executing & (id_fsm_q == FIRST_CYCLE) & branch_decision_i)
   `DV_FCOV_SIGNAL(logic, branch_not_taken,
@@ -1291,5 +1320,6 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   `ASSERT_IF(IbexCheriotStoreDisabled, !cheriot_store_o,        cheriot_enable_i != IbexMuBiOn)
   `ASSERT_IF(IbexInstrNotCheriot,      !instr_is_cheriot_id_o,  cheriot_enable_i != IbexMuBiOn)
   `ASSERT_IF(IbexCheriotExecDisabled,  !cheriot_exec_id_o,      cheriot_enable_i != IbexMuBiOn)
+  `ASSERT_IF(IbexCheriotExecSpecDisabled, !cheriot_exec_id_spec_o, cheriot_enable_i != IbexMuBiOn)
 
 endmodule

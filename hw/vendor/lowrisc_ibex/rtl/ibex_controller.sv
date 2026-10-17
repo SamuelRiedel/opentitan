@@ -131,8 +131,9 @@ module ibex_controller import ibex_pkg::*; #(
   input  logic                  cheriot_wb_err_i,
   input  logic  [11:0]          cheriot_ex_err_info_i,
   input  logic  [15:0]          cheriot_wb_err_info_i,
-  input  logic                  cheriot_branch_req_i,
-  input  logic [31:0]           cheriot_branch_target_i
+  input  logic                  cheriot_branch_req_i,      // speculative, one cycle per instr
+  input  logic [31:0]           cheriot_branch_target_i,
+  input  logic                  cheriot_jump_pending_i     // CJALR redirected, PCC not yet updated
 );
 
   ctrl_fsm_e ctrl_fsm_cs, ctrl_fsm_ns;
@@ -688,6 +689,11 @@ module ibex_controller import ibex_pkg::*; #(
 
           perf_tbranch_o = branch_set_i;
           perf_jump_o    = jump_set_i;
+        end
+
+        // Hold IF while a speculative CJALR awaits its PCC update.
+        if ((cheriot_enable_i == IbexMuBiOn) & cheriot_jump_pending_i) begin
+          halt_if = 1'b1;
         end
 
         if (BranchPredictor) begin
