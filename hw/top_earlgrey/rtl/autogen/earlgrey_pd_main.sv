@@ -111,8 +111,8 @@ module earlgrey_pd_main #(
       tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM,
   parameter int unsigned RvCoreIbexCheriotTrvkHeapBaseAddr =
       tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM,
-  parameter bit RvCoreIbexRegisterTRVKDecision = 1,
-  parameter bit RvCoreIbexImpreciseBusErrors = 0,
+  parameter bit RvCoreIbexRegisterTRVKDecision = 0,
+  parameter bit RvCoreIbexImpreciseBusErrors = 1,
   parameter bit RvCoreIbexRV32E = 0,
   parameter ibex_pkg::rv32m_e RvCoreIbexRV32M = ibex_pkg::RV32MSingleCycle,
   parameter ibex_pkg::rv32b_e RvCoreIbexRV32B = ibex_pkg::RV32BFull,

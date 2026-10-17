@@ -10459,8 +10459,8 @@
         CheriotRevBitmapAddrWidth: $clog2(tl_main_pkg::ADDR_SIZE_CHERIOT_MEM_SYS__REVBM)
         CheriotRevBitmapBaseAddr: tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM
         CheriotTrvkHeapBaseAddr: tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM
-        RegisterTRVKDecision: "1"
-        ImpreciseBusErrors: "0"
+        RegisterTRVKDecision: "0"
+        ImpreciseBusErrors: "1"
         RV32E: "0"
         RV32M: ibex_pkg::RV32MSingleCycle
         RV32B: ibex_pkg::RV32BFull
@@ -10656,7 +10656,7 @@
           name: RegisterTRVKDecision
           desc: Register the TRVK revocation bitmap lookup decision. See timing scenario T.
           type: bit
-          default: "1"
+          default: "0"
           local: "false"
           expose: "true"
           name_top: RvCoreIbexRegisterTRVKDecision
@@ -10665,7 +10665,7 @@
           name: ImpreciseBusErrors
           desc: Make data bus errors imprecise, breaking data_err_i to data_req_o path. See timing scenario C.
           type: bit
-          default: "0"
+          default: "1"
           local: "false"
           expose: "true"
           name_top: RvCoreIbexImpreciseBusErrors
