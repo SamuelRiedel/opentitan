@@ -129,6 +129,14 @@
       default: "31",
       local:   "true"
     },
+
+    { name:    "MetaRspReg"
+      type:    "bit"
+      default: "0"
+      desc:    "Register the meta SRAM response paths. See timing scenario D."
+      local:   "false"
+      expose:  "true"
+    },
   ],
 
   //////////////

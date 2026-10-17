@@ -375,6 +375,20 @@
       local:   "false"
       expose:  "true"
     },
+    { name:    "RegisterTRVKDecision"
+      type:    "bit"
+      default: "0"
+      desc:    "Register the TRVK revocation bitmap lookup decision. See timing scenario T."
+      local:   "false"
+      expose:  "true"
+    },
+    { name:    "ImpreciseBusErrors"
+      type:    "bit"
+      default: "0"
+      desc:    "Make data bus errors imprecise, breaking data_err_i to data_req_o path. See timing scenario C."
+      local:   "false"
+      expose:  "true"
+    },
     { name:    "RV32E"
       type:    "bit"
       default: "0"

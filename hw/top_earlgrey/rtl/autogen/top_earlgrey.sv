@@ -128,6 +128,8 @@ module top_earlgrey #(
       tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM,
   parameter int unsigned RvCoreIbexCheriotTrvkHeapBaseAddr =
       tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM,
+  parameter bit RvCoreIbexRegisterTRVKDecision = 1,
+  parameter bit RvCoreIbexImpreciseBusErrors = 1,
   parameter bit RvCoreIbexRV32E = 0,
   parameter ibex_pkg::rv32m_e RvCoreIbexRV32M = ibex_pkg::RV32MSingleCycle,
   parameter ibex_pkg::rv32b_e RvCoreIbexRV32B = ibex_pkg::RV32BFull,
@@ -164,6 +166,7 @@ module top_earlgrey #(
       tl_main_pkg::ADDR_SPACE_RRAM_CTRL__HOST + tl_main_pkg::ADDR_MASK_RRAM_CTRL__HOST + 1,
   parameter logic [top_pkg::TL_AW-1:0] CheriotMemSysMetaSramBaseAddr =
       tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM,
+  parameter bit CheriotMemSysMetaRspReg = 1,
   // parameters for sram_ctrl_meta
   parameter int SramCtrlMetaInstSize = 38912,
   parameter int SramCtrlMetaNumRamInst = 1,
@@ -464,6 +467,8 @@ module top_earlgrey #(
   .RvCoreIbexCheriotRevBitmapAddrWidth(RvCoreIbexCheriotRevBitmapAddrWidth),
   .RvCoreIbexCheriotRevBitmapBaseAddr(RvCoreIbexCheriotRevBitmapBaseAddr),
   .RvCoreIbexCheriotTrvkHeapBaseAddr(RvCoreIbexCheriotTrvkHeapBaseAddr),
+  .RvCoreIbexRegisterTRVKDecision(RvCoreIbexRegisterTRVKDecision),
+  .RvCoreIbexImpreciseBusErrors(RvCoreIbexImpreciseBusErrors),
   .RvCoreIbexRV32E(RvCoreIbexRV32E),
   .RvCoreIbexRV32M(RvCoreIbexRV32M),
   .RvCoreIbexRV32B(RvCoreIbexRV32B),
@@ -492,6 +497,7 @@ module top_earlgrey #(
   .CheriotMemSysNvmBaseAddr(CheriotMemSysNvmBaseAddr),
   .CheriotMemSysNvmTopAddr(CheriotMemSysNvmTopAddr),
   .CheriotMemSysMetaSramBaseAddr(CheriotMemSysMetaSramBaseAddr),
+  .CheriotMemSysMetaRspReg(CheriotMemSysMetaRspReg),
   .SramCtrlMetaInstSize(SramCtrlMetaInstSize),
   .SramCtrlMetaNumRamInst(SramCtrlMetaNumRamInst),
   .SramCtrlMetaInstrExec(SramCtrlMetaInstrExec),
