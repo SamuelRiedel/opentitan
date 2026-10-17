@@ -1098,7 +1098,7 @@
                    CheriotRevBitmapBaseAddr: "tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM",
                    CheriotTrvkHeapBaseAddr: "tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM",
                    RegisterTRVKDecision: "0",
-                   ImpreciseBusErrors: "1",
+                   ImpreciseBusErrors: "0",
                    RV32E: "0",
                    RV32M: "ibex_pkg::RV32MSingleCycle",
                    RV32B: "ibex_pkg::RV32BFull",
@@ -1153,7 +1153,7 @@
         NvmBaseAddr:      "tl_main_pkg::ADDR_SPACE_RRAM_CTRL__HOST",
         NvmTopAddr:       "tl_main_pkg::ADDR_SPACE_RRAM_CTRL__HOST + tl_main_pkg::ADDR_MASK_RRAM_CTRL__HOST + 1",
         MetaSramBaseAddr: "tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM",
-        MetaRspReg: "0",
+        MetaRspReg: "1",
       },
       base_addrs: {
         regs:  {hart: "0x411B0000"},

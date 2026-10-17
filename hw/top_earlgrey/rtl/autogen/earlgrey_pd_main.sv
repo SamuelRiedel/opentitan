@@ -112,7 +112,7 @@ module earlgrey_pd_main #(
   parameter int unsigned RvCoreIbexCheriotTrvkHeapBaseAddr =
       tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM,
   parameter bit RvCoreIbexRegisterTRVKDecision = 0,
-  parameter bit RvCoreIbexImpreciseBusErrors = 1,
+  parameter bit RvCoreIbexImpreciseBusErrors = 0,
   parameter bit RvCoreIbexRV32E = 0,
   parameter ibex_pkg::rv32m_e RvCoreIbexRV32M = ibex_pkg::RV32MSingleCycle,
   parameter ibex_pkg::rv32b_e RvCoreIbexRV32B = ibex_pkg::RV32BFull,
@@ -149,7 +149,7 @@ module earlgrey_pd_main #(
       tl_main_pkg::ADDR_SPACE_RRAM_CTRL__HOST + tl_main_pkg::ADDR_MASK_RRAM_CTRL__HOST + 1,
   parameter logic [top_pkg::TL_AW-1:0] CheriotMemSysMetaSramBaseAddr =
       tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM,
-  parameter bit CheriotMemSysMetaRspReg = 0,
+  parameter bit CheriotMemSysMetaRspReg = 1,
   // parameters for sram_ctrl_meta
   parameter int SramCtrlMetaInstSize = 38912,
   parameter int SramCtrlMetaNumRamInst = 1,
