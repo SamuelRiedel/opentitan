@@ -1097,7 +1097,7 @@
                    CheriotRevBitmapAddrWidth: "$clog2(tl_main_pkg::ADDR_SIZE_CHERIOT_MEM_SYS__REVBM)",
                    CheriotRevBitmapBaseAddr: "tl_main_pkg::ADDR_SPACE_CHERIOT_MEM_SYS__REVBM",
                    CheriotTrvkHeapBaseAddr: "tl_main_pkg::ADDR_SPACE_SRAM_CTRL_MAIN__RAM",
-                   RegisterTRVKDecision: "0",
+                   RegisterTRVKDecision: "1",
                    ImpreciseBusErrors: "0",
                    RV32E: "0",
                    RV32M: "ibex_pkg::RV32MSingleCycle",
