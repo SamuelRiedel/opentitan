@@ -135,6 +135,9 @@
           # check-lock-files regenerates python-requirements.txt via `uv pip compile`.
           uv
           pkgs.iproute2
+          # rsvg-convert, used by the synthesis timing plots (eg2-synth `make plot`) to
+          # render SVG to PDF.
+          pkgs.librsvg
         ];
         # Point the Bazel bindgen toolchain at a nixpkgs libclang (see
         # third_party/rust/extensions.bzl): the LLVM release Bazel would download
