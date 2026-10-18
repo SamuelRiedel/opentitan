@@ -436,6 +436,7 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   logic                   instr_is_rv32lsu_id;
   logic                   cheriot_exec_id;
   logic                   cheriot_exec_id_spec;
+  logic                   cheriot_exec_lsu;
   logic [11:0]            cheriot_imm12;
   logic [19:0]            cheriot_imm20;
   logic [20:0]            cheriot_imm21;
@@ -839,6 +840,7 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
 
     .cheriot_exec_id_o       (cheriot_exec_id),
     .cheriot_exec_id_spec_o  (cheriot_exec_id_spec),
+    .cheriot_exec_lsu_o      (cheriot_exec_lsu),
     .instr_is_cheriot_id_o   (instr_is_cheriot_id),
     .instr_is_rv32lsu_id_o   (instr_is_rv32lsu_id),
     .cheriot_imm12_o         (cheriot_imm12),
@@ -939,6 +941,7 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
       .branch_target_o         (branch_target_ex_cheriot),
       .cheriot_exec_id_i       (cheriot_exec_id),
       .cheriot_exec_id_spec_i  (cheriot_exec_id_spec),
+      .cheriot_exec_lsu_i      (cheriot_exec_lsu),
       .instr_valid_i           (instr_valid_id),
       .instr_first_cycle_i     (instr_first_cycle_id),
       .instr_is_cheriot_i      (instr_is_cheriot_id),
@@ -1061,7 +1064,8 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
                                       (^rf_wcap_fwd_wb) | (^cheriot_cap_field_sel) |
                                       (^cheriot_adder_a_sel) | (^cheriot_adder_b_sel) |
                                       (^cheriot_setaddr_sel) | (^cheriot_setbounds_sel) |
-                                      (^rf_rcap_a) | (^rf_rcap_b) | cheriot_exec_id_spec;
+                                      (^rf_rcap_a) | (^rf_rcap_b) | cheriot_exec_id_spec |
+                                      cheriot_exec_lsu;
   end
 
   /////////////////////

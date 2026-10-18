@@ -41,6 +41,7 @@ module ibex_cheriot_ex import ibex_cheriot_pkg::*; import ibex_pkg::*; #(
   // Interface to ID stage control logic
   input  logic                   cheriot_exec_id_i,
   input  logic                   cheriot_exec_id_spec_i, // speculative, only for branch_req_spec_o
+  input  logic                   cheriot_exec_lsu_i,     // qualifies cheriot LSU requests
   input  logic                   instr_first_cycle_i,   // 1st exec cycle allowing lsu_req
 
   // inputs from decoder
@@ -562,8 +563,10 @@ module ibex_cheriot_ex import ibex_cheriot_pkg::*; import ibex_pkg::*; #(
     // till WB is ready (lsu_resp for the previous isntr)
     logic unused_instr_first_cycle;
     assign unused_instr_first_cycle = instr_first_cycle_i;  // not needed with WB stage
-    assign cheriot_lsu_req = is_cap & cheriot_exec_id_i;
+    assign cheriot_lsu_req = is_cap & cheriot_exec_lsu_i;
   end else begin : gen_lsu_req_no_wb_stage
+    logic unused_cheriot_exec_lsu;
+    assign unused_cheriot_exec_lsu = cheriot_exec_lsu_i;
     // no WB stage, only assert req in the first_cycle phase of the instruction
     // (consistent with the RV32 load/store instructions)
     // Here instruction won't complete till lsu_resp_valid in this case,

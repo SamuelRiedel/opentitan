@@ -77,6 +77,7 @@ module ibex_controller import ibex_pkg::*; #(
   input  logic                  mem_resp_intg_err_i,
   input  logic                  lsu_err_is_cheriot_i,
   output logic                  wb_exception_o,          // Instruction in WB taking an exception
+  output logic                  wb_exception_lsu_o,      // wb_exception_o w/o load/store_err_i
   output logic                  id_exception_o,          // Instruction in ID taking an exception
   output logic                  id_exception_nc_o,       // no-cheriot
 
@@ -343,6 +344,10 @@ module ibex_controller import ibex_pkg::*; #(
     assign wb_exception_o = load_err_q | store_err_q
                           | (ImpreciseBusErrors ? 1'b0 : (load_err_i | store_err_i))
                           | ((cheriot_enable_i == IbexMuBiOn) & cheriot_wb_err_i);
+    // Registered terms only. Qualifies LSU requests, which are never issued while a load/store
+    // is in WB, so load_err_i/store_err_i cannot be set when it matters.
+    assign wb_exception_lsu_o = load_err_q | store_err_q
+                              | ((cheriot_enable_i == IbexMuBiOn) & cheriot_wb_err_i);
   end else begin : g_no_wb_exceptions
     always_comb begin
       instr_fetch_err_prio = 0;
@@ -375,7 +380,8 @@ module ibex_controller import ibex_pkg::*; #(
         cheriot_asr_err_prio = 1'b1;
       end
     end
-    assign wb_exception_o = 1'b0;
+    assign wb_exception_o     = 1'b0;
+    assign wb_exception_lsu_o = 1'b0;
   end
 
   `ASSERT_IF(IbexExceptionPrioOnehot,
