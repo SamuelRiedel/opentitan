@@ -559,8 +559,8 @@ module ibex_cheriot_ex import ibex_cheriot_pkg::*; import ibex_pkg::*; #(
 
   if (WritebackStage) begin : gen_lsu_req_wb_stage
     // assert LSU req until instruction is retired (req_done from LSU)
-    // note if the previous instr is also a load/store, cheriot_exec_id won't be asserted
-    // till WB is ready (lsu_resp for the previous isntr)
+    // note if the previous instr is also a load/store, cheriot_exec_lsu won't be asserted
+    // till WB is ready (lsu_resp for the previous isntr), unless the LSU takes early requests
     logic unused_instr_first_cycle;
     assign unused_instr_first_cycle = instr_first_cycle_i;  // not needed with WB stage
     assign cheriot_lsu_req = is_cap & cheriot_exec_lsu_i;

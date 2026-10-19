@@ -196,6 +196,8 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   localparam bit          DataIndTiming = SecureIbex;
   localparam bit          PCIncrCheck   = SecureIbex;
   localparam bit          ShadowCSR     = 1'b0;
+  // Requesting before the previous response commits the request before its error is known
+  localparam bit          EarlyDataReq  = ImpreciseBusErrors & WritebackStage;
 
   // IF/ID signals
   logic        dummy_instr_id;
@@ -1079,7 +1081,8 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   ibex_load_store_unit #(
     .MemECC(MemECC),
     .MemDataWidth(MemDataWidth),
-    .BaseIsa(BaseIsa)
+    .BaseIsa(BaseIsa),
+    .EarlyDataReq(EarlyDataReq)
   ) load_store_unit_i (
     .clk_i (clk_i),
     .rst_ni(rst_ni),
@@ -1111,6 +1114,7 @@ module ibex_core import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
     .lsu_rcap_o       (rf_wcap_lsu),
     .lsu_rdata_valid_o(lsu_rdata_valid),
     .lsu_req_i        (lsu_req),
+    .lsu_rsp_pending_i(outstanding_load_wb | outstanding_store_wb),
     .lsu_is_cap_i     (lsu_is_cap),
     .lsu_lc_clrperm_i (lsu_lc_clrperm),
     .lsu_cheriot_err_i(lsu_cheriot_err),

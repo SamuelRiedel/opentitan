@@ -18,7 +18,10 @@
 module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   parameter base_isa_e   BaseIsa      = BaseIsaRV32I,
   parameter bit          MemECC       = 1'b0,
-  parameter int unsigned MemDataWidth = MemECC ? 32 + 7 : 32
+  parameter int unsigned MemDataWidth = MemECC ? 32 + 7 : 32,
+  // Allow a request while the access in WB still awaits its response. Only the grant is tracked
+  // until that response arrives; the IDLE actions are then replayed.
+  parameter bit          EarlyDataReq = 1'b0
 ) (
   input  logic         clk_i,
   input  logic         rst_ni,
@@ -53,6 +56,7 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   output logic [31:0]  lsu_rdata_o,          // requested data                   -> to ID/EX
   output logic         lsu_rdata_valid_o,
   input  logic         lsu_req_i,            // data request                     -> from ID/EX
+  input  logic         lsu_rsp_pending_i,    // load/store in WB awaits response -> from WB
 
   input  logic [31:0]  adder_result_ex_i,    // address computed in ALU          -> from ID/EX
 
@@ -118,6 +122,10 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   cap_clrperm_t resp_lc_clrperm_q;
   logic         lsu_go, lsu_go_goodcap;
   logic         cpu_req_erred, cpu_req_valid;
+  logic         all_resp;
+  logic         early_wait;     // access in WB still awaits its response after this cycle
+  logic         idle_gnt;       // grant seen by the IDLE logic, incl. one taken early
+  logic         ls_fsm_idle;    // IDLE or an early state: the response belongs to WB
 
   ls_fsm_e      ls_fsm_cs, ls_fsm_ns;
 
@@ -407,6 +415,10 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   assign cpu_req_valid = lsu_req_i & ~((cheriot_enable_i == IbexMuBiOn) & lsu_cheriot_err_i);
   assign cpu_req_erred = lsu_req_i &  (cheriot_enable_i == IbexMuBiOn) & lsu_cheriot_err_i;
 
+  assign ls_fsm_idle = ls_fsm_cs inside {IDLE, EARLY_WAIT_GNT, EARLY_GNT};
+  assign early_wait  = EarlyDataReq & lsu_rsp_pending_i & ~all_resp;
+  assign idle_gnt    = data_gnt_i | (ls_fsm_cs == EARLY_GNT);
+
   // FSM
   always_comb begin
     ls_fsm_ns           = ls_fsm_cs;
@@ -430,14 +442,24 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
 
     unique case (ls_fsm_cs)
 
-      IDLE: begin
+      // EARLY_WAIT_GNT: request raised before the response of the access in WB, not yet granted.
+      // EARLY_GNT: such a request was granted. Both replay the IDLE actions once that response
+      // arrives; the ID/EX inputs are stable as the instruction cannot leave ID before.
+      IDLE, EARLY_WAIT_GNT, EARLY_GNT: begin
         pmp_err_d   = 1'b0;
         cheriot_err_d = 1'b0;
 
-        if ((BaseIsa == BaseIsaRV32IorCHERIoT) & (cheriot_enable_i == IbexMuBiOn) &
+        // Kept independent of the response so data_rvalid_i does not reach data_req_o
+        data_req_o  = (ls_fsm_cs == IDLE) ? cpu_req_valid : (ls_fsm_cs == EARLY_WAIT_GNT);
+
+        if (early_wait) begin
+          // Only track the grant, the response still uses the current ctrl/error state
+          if ((ls_fsm_cs == EARLY_WAIT_GNT) || ((ls_fsm_cs == IDLE) && cpu_req_valid)) begin
+            ls_fsm_ns = data_gnt_i ? EARLY_GNT : EARLY_WAIT_GNT;
+          end
+        end else if ((BaseIsa == BaseIsaRV32IorCHERIoT) & (cheriot_enable_i == IbexMuBiOn) &
             cpu_req_erred) begin
           // cheriot access error: don't issue data_req; send error response back to WB stage
-          data_req_o    = 1'b0;
           cheriot_err_d = 1'b1;
           ctrl_update   = 1'b1;         // update ctrl/address so we can report error correctly
           addr_update   = 1'b1;
@@ -449,7 +471,6 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
         end else if ((BaseIsa == BaseIsaRV32IorCHERIoT) & (cheriot_enable_i == IbexMuBiOn) &
             cpu_req_valid & lsu_is_cap_i) begin
           // normal cap access case
-          data_req_o     = 1'b1;
           cheriot_err_d  = 1'b0;
           pmp_err_d      = data_pmp_err_i;
           lsu_err_d      = 1'b0;
@@ -458,7 +479,7 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
           lsu_go         = 1'b1;         // decision to move forward with a request
           lsu_go_goodcap = 1'b1;
 
-          if (data_gnt_i) begin
+          if (idle_gnt) begin
             ctrl_update = 1'b1;
             addr_update = 1'b1;
             ls_fsm_ns   = CTX_WAIT_GNT2;
@@ -467,7 +488,6 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
           end
         end else if (cpu_req_valid) begin
           // normal data access case
-          data_req_o    = 1'b1;
           cheriot_err_d = 1'b0;
           pmp_err_d     = data_pmp_err_i;
           lsu_err_d     = 1'b0;
@@ -475,7 +495,7 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
           perf_store_o  = lsu_we_i;
           lsu_go        = 1'b1;         // decision to move forward with a request
 
-          if (data_gnt_i) begin
+          if (idle_gnt) begin
             ctrl_update         = 1'b1;
             addr_update         = 1'b1;
             handle_misaligned_d = split_misaligned_access;
@@ -483,6 +503,8 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
           end else begin
             ls_fsm_ns           = split_misaligned_access ? WAIT_GNT_MIS    : WAIT_GNT;
           end
+        end else begin
+          ls_fsm_ns = IDLE;
         end
       end
 
@@ -659,8 +681,8 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
       // lsu_is_cap_i aligns with requests
       //   we use lsu_go to qualify this update
       //   - note this implies that LSU only support a outstand request at a time
-      //   - new request can't be issued (go) until resp_valid
-      //   - also note resp_valid is gated by (ls_fsm_cs == IDLE)
+      //   - new request can't be issued (go) until resp_valid (an early request defers go)
+      //   - also note resp_valid is gated by ls_fsm_idle
       if (lsu_go) begin
         resp_is_cap_q     <= lsu_is_cap_i;
         resp_lc_clrperm_q <= lsu_lc_clrperm_i;
@@ -684,17 +706,16 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   // Outputs //
   /////////////
 
-  logic all_resp;
   assign data_or_pmp_err    = lsu_err_q | data_bus_err_i | pmp_err_q |
                               ((cheriot_enable_i == IbexMuBiOn) &
                                (cheriot_err_q | (resp_is_cap_q & cap_lsw_err_q)));
 
   assign all_resp           = data_rvalid_i | pmp_err_q |
                               ((cheriot_enable_i == IbexMuBiOn) & cheriot_err_q);
-  assign lsu_resp_valid_o   = all_resp & (ls_fsm_cs == IDLE);
+  assign lsu_resp_valid_o   = all_resp & ls_fsm_idle;
 
   // this goes to wb as rf_we_lsu, so needs to be gated when data needs to go back to EX
-  assign lsu_rdata_valid_o  = (ls_fsm_cs == IDLE) & data_rvalid_i & ~data_or_pmp_err & ~data_we_q &
+  assign lsu_rdata_valid_o  = ls_fsm_idle & data_rvalid_i & ~data_or_pmp_err & ~data_we_q &
                               ~data_intg_err;
 
   // output to register file
@@ -821,7 +842,16 @@ module ibex_load_store_unit import ibex_pkg::*; import ibex_cheriot_pkg::*; #(
   `ASSERT(IbexLsuStateValid, ls_fsm_cs inside {
       IDLE, WAIT_GNT_MIS, WAIT_RVALID_MIS, WAIT_GNT,
       WAIT_RVALID_MIS_GNTS_DONE,
-      CTX_WAIT_GNT1, CTX_WAIT_GNT2, CTX_WAIT_RESP})
+      CTX_WAIT_GNT1, CTX_WAIT_GNT2, CTX_WAIT_RESP,
+      EARLY_WAIT_GNT, EARLY_GNT})
+
+  // Early states: only with EarlyDataReq, while WB awaits a response, and the request (and with it
+  // the ID/EX inputs replayed later) is held. An early grant never sees a second grant.
+  `ASSERT(IbexLsuEarlyOnlyIfEnabled, ls_fsm_cs inside {EARLY_WAIT_GNT, EARLY_GNT} |-> EarlyDataReq)
+  `ASSERT(IbexLsuEarlyRspPending, ls_fsm_cs inside {EARLY_WAIT_GNT, EARLY_GNT} |->
+          lsu_rsp_pending_i)
+  `ASSERT(IbexLsuEarlyReqHeld, ls_fsm_cs inside {EARLY_WAIT_GNT, EARLY_GNT} |-> cpu_req_valid)
+  `ASSERT(IbexLsuEarlyNoSecondGnt, ls_fsm_cs == EARLY_GNT |-> !data_gnt_i)
 
   // Address must not contain X when request is sent.
   `ASSERT(IbexDataAddrUnknown, data_req_o |-> !$isunknown(data_addr_o))

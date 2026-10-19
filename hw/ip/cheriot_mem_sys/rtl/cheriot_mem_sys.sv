@@ -183,6 +183,12 @@ module cheriot_mem_sys
   tlul_pkg::tl_h2d_t tbre_revbm_tl_h2d;
   tlul_pkg::tl_d2h_t tbre_revbm_tl_d2h;
 
+  // Core host port between the tag filter and the single-outstanding stage
+  tlul_pkg::tl_h2d_t cored_filt_tl_h2d;
+  tlul_pkg::tl_d2h_t cored_filt_tl_d2h;
+  logic              cored_outstanding_q;
+  logic              cored_can_issue;
+
   tlul_pkg::tl_h2d_t meta_mux_in_tl_h2d[32'd4];
   tlul_pkg::tl_d2h_t meta_mux_in_tl_d2h[32'd4];
 
@@ -278,10 +284,33 @@ module cheriot_mem_sys
     .bit_sel_m_o(tag_mux_in_bit_sel[32'd0]),
     .tl_m_i     (tag_mux_in_tl_d2h[32'd0]),
     .tag_m_i    (tag_mux_in_tag_d2h[32'd0]),
-    .tl_h_o     (cored_tl_h_o),
-    .tl_h_i     (cored_tl_h_i),
+    .tl_h_o     (cored_filt_tl_h2d),
+    .tl_h_i     (cored_filt_tl_d2h),
     .wtrc_err_o (cheriot_fatal_error.wtrc_error)
   );
+
+  // At most one core request outstanding towards the crossbar, so responses from different
+  // devices return in order while the core requests ahead. A held request goes out in the cycle
+  // the previous response completes: the response -> request path stays local to this stage.
+  assign cored_can_issue = !cored_outstanding_q ||
+                           (cored_tl_h_i.d_valid && cored_filt_tl_h2d.d_ready);
+
+  always_comb begin : proc_cored_single_outstanding
+    cored_tl_h_o              = cored_filt_tl_h2d;
+    cored_tl_h_o.a_valid      = cored_filt_tl_h2d.a_valid && cored_can_issue;
+    cored_filt_tl_d2h         = cored_tl_h_i;
+    cored_filt_tl_d2h.a_ready = cored_tl_h_i.a_ready && cored_can_issue;
+  end
+
+  always_ff @(posedge clk_i or negedge rst_ni) begin : proc_cored_outstanding
+    if (!rst_ni) begin
+      cored_outstanding_q <= 1'b0;
+    end else if (cored_tl_h_o.a_valid && cored_tl_h_i.a_ready) begin
+      cored_outstanding_q <= 1'b1;
+    end else if (cored_tl_h_i.d_valid && cored_filt_tl_h2d.d_ready) begin
+      cored_outstanding_q <= 1'b0;
+    end
+  end
 
   // Arbitrates the tag traffic of the core's and the revocation engine's tag filters onto the
   // single RMW filter.
@@ -798,6 +827,7 @@ module cheriot_mem_sys
   `ASSERT_KNOWN(CoredTlHAValidKnown_A, cored_tl_h_o.a_valid)
   `ASSERT_KNOWN(CoredTlHDReadyKnown_A, cored_tl_h_o.d_ready)
   `ASSERT_KNOWN_IF(CoredTlHPayloadKnown_A, cored_tl_h_o, cored_tl_h_o.a_valid)
+  `ASSERT(CoredTlHRspOutstanding_A, cored_tl_h_i.d_valid |-> cored_outstanding_q)
 
   `ASSERT_KNOWN(TbreTlHAValidKnown_A, tbre_tl_h_o.a_valid)
   `ASSERT_KNOWN(TbreTlHDReadyKnown_A, tbre_tl_h_o.d_ready)

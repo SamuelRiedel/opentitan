@@ -243,7 +243,6 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
   logic        wfi_insn_dec;
 
   logic        wb_exception;
-  logic        wb_exception_lsu;
   logic        unused_id_exception;
   logic        id_exception_nc;
 
@@ -673,7 +672,6 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     .mem_resp_intg_err_i  (mem_resp_intg_err),
     .store_err_i          (lsu_store_err_i),
     .wb_exception_o       (wb_exception),
-    .wb_exception_lsu_o   (wb_exception_lsu),
     .id_exception_o       (unused_id_exception),
     .id_exception_nc_o    (id_exception_nc),
 
@@ -1020,10 +1018,8 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     logic rf_rd_b_hz;
 
     logic outstanding_memory_access;
-    logic mem_access_in_wb;
 
     logic instr_kill;
-    logic instr_kill_lsu;
 
     assign multicycle_done = (lsu_req_dec | cheriot_lsu_req_dec) ? ~stall_mem : ex_valid_all;
 
@@ -1031,19 +1027,14 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     assign outstanding_memory_access = (outstanding_load_wb_i | outstanding_store_wb_i) &
                                        ~lsu_resp_valid_i;
 
-    // Registered version without the finishing response. Gating LSU requests on this inserts a
-    // bubble between a response and the next request, but cuts data_rvalid_i -> data_req_o.
-    assign mem_access_in_wb = outstanding_load_wb_i | outstanding_store_wb_i;
-
-    // Without a load/store in WB, load_err_i/store_err_i are clear, so the registered
-    // wb_exception_lsu is equivalent to wb_exception here.
-    assign instr_kill_lsu = instr_fetch_err_i |
-                            wb_exception_lsu  |
-                            id_exception_nc   |
-                            ~controller_run;
-
-    // Can start a new memory access only once any previous one has finished
-    assign data_req_allowed = instr_valid_i & ~instr_kill_lsu & ~stall_ld_hz & ~mem_access_in_wb;
+    // With imprecise bus errors, a load/store may request while the one in WB still awaits its
+    // response (the LSU defers everything but the grant). This keeps data_rvalid_i out of
+    // data_req_o without a bubble. wb_exception then holds registered terms only.
+    if (ImpreciseBusErrors) begin : gen_early_data_req
+      assign data_req_allowed = instr_valid_i & ~instr_kill & ~stall_ld_hz;
+    end else begin : gen_no_early_data_req
+      assign data_req_allowed = instr_executing;
+    end
 
     // Instruction won't execute because:
     // - There is a pending exception in writeback
@@ -1106,16 +1097,21 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
                                     instr_is_legal_cheriot & instr_executing_spec;
 
     // cheriot_exec_id_o with the same LSU request qualification as data_req_allowed
-    assign cheriot_exec_lsu_o = (cheriot_enable_i == IbexMuBiOn) & instr_valid_i &
-                                ~instr_fetch_err_i     &
-                                instr_is_legal_cheriot &
-                                controller_run         &
-                                ~wb_exception_lsu      &
-                                ~stall_ld_hz           &
-                                ~mem_access_in_wb;
+    if (ImpreciseBusErrors) begin : gen_early_cheriot_lsu
+      assign cheriot_exec_lsu_o = (cheriot_enable_i == IbexMuBiOn) & instr_valid_i &
+                                  ~instr_fetch_err_i     &
+                                  instr_is_legal_cheriot &
+                                  controller_run         &
+                                  ~wb_exception          &
+                                  ~stall_ld_hz;
+    end else begin : gen_no_early_cheriot_lsu
+      assign cheriot_exec_lsu_o = cheriot_exec_id_o;
+    end
 
-    `ASSERT(IbexDataReqAllowedIfExecuting, data_req_allowed |-> instr_executing)
-    `ASSERT(IbexCheriotExecLsuIfExec, cheriot_exec_lsu_o |-> cheriot_exec_id_o)
+    `ASSERT(IbexExecutingIfDataReqAllowed,
+      data_req_allowed & ~outstanding_memory_access |-> instr_executing)
+    `ASSERT(IbexDataReqAllowedIfExecuting, instr_executing |-> data_req_allowed)
+    `ASSERT(IbexCheriotExecLsuIfExec, cheriot_exec_id_o |-> cheriot_exec_lsu_o)
 
     `ASSERT(IbexExecutingSpecIfExecuting, instr_executing |-> instr_executing_spec)
     `ASSERT(IbexCheriotExecutingSpecIfExecuting, cheriot_exec_id_o |-> cheriot_exec_id_spec_o)
@@ -1238,7 +1234,7 @@ module ibex_id_stage import ibex_cheriot_pkg::*; #(
     assign unused_rf_write_wb          = rf_write_wb_i;
     assign unused_outstanding_load_wb  = outstanding_load_wb_i;
     assign unused_outstanding_store_wb = outstanding_store_wb_i;
-    assign unused_wb_exception         = wb_exception | wb_exception_lsu;
+    assign unused_wb_exception         = wb_exception;
     assign unused_rf_wdata_fwd_wb      = rf_wdata_fwd_wb_i;
 
     logic unused_cheriot_wb_signals;

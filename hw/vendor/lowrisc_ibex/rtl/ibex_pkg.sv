@@ -788,7 +788,8 @@ package ibex_pkg;
   typedef enum logic [3:0]  {
     IDLE, WAIT_GNT_MIS, WAIT_RVALID_MIS, WAIT_GNT,
     WAIT_RVALID_MIS_GNTS_DONE,
-    CTX_WAIT_GNT1, CTX_WAIT_GNT2, CTX_WAIT_RESP
+    CTX_WAIT_GNT1, CTX_WAIT_GNT2, CTX_WAIT_RESP,
+    EARLY_WAIT_GNT, EARLY_GNT
   } ls_fsm_e;
 
   typedef enum logic [2:0] {CRX_IDLE, CRX_WAIT_RESP1, CRX_WAIT_RESP2} cap_rx_fsm_t;
