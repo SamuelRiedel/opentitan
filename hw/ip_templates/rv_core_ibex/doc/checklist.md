@@ -35,24 +35,24 @@ Security      | [SEC_CM_SCOPED][]              | Done        | [Security counter
 
 Type          | Item                      | Resolution  | Note/Collaterals
 --------------|---------------------------|-------------|------------------
-Documentation | [NEW_FEATURES][]          | Not Started |
-Documentation | [BLOCK_DIAGRAM][]         | Not Started |
-Documentation | [DOC_INTERFACE][]         | Not Started |
-Documentation | [DOC_INTEGRATION_D2][]    | Not Started |
-Documentation | [MISSING_FUNC][]          | Not Started |
-Documentation | [FEATURE_FROZEN][]        | Not Started |
-RTL           | [FEATURE_COMPLETE][]      | Not Started |
-RTL           | [PORT_FROZEN][]           | Not Started |
-RTL           | [ARCHITECTURE_FROZEN][]   | Not Started |
-RTL           | [REVIEW_TODO][]           | Not Started |
-RTL           | [STYLE_X][]               | Not Started |
-RTL           | [CDC_SYNCMACRO][]         | Not Started |
-Code Quality  | [LINT_PASS][]             | Not Started |
-Code Quality  | [CDC_SETUP][]             | Not Started |
-Code Quality  | [RDC_SETUP][]             | Not Started |
-Code Quality  | [AREA_CHECK][]            | Not Started |
-Code Quality  | [TIMING_CHECK][]          | Not Started |
-Security      | [SEC_CM_DOCUMENTED][]     | Not Started |
+Documentation | [NEW_FEATURES][]          | Done        | None
+Documentation | [BLOCK_DIAGRAM][]         | Done        | The Ibex block diagrams have been updated, see the [Ibex documentation](https://ibex-core.readthedocs.io/en/latest/03_reference/pipeline_details.html).
+Documentation | [DOC_INTERFACE][]         | Done        | [Interfaces](interfaces.md). Ibex interfaces are documented in the Ibex [integration](https://ibex-core.readthedocs.io/en/latest/02_user/integration.html) and [CHERIoT](https://ibex-core.readthedocs.io/en/latest/03_reference/cheriot.html) docs.
+Documentation | [DOC_INTEGRATION_D2][]    | Done        | Supported parameter set is the `opentitan` configuration in the [Ibex documentation](https://ibex-core.readthedocs.io/en/latest/02_user/configuration.html#supported-parameter-sets). Earl Grey wrapper parameters: `num_regions=2`, `cheriot_available=true`, `racl_support=false`.
+Documentation | [MISSING_FUNC][]          | Done        | None
+Documentation | [FEATURE_FROZEN][]        | Done        | Frozen.
+RTL           | [FEATURE_COMPLETE][]      | Done        | All specified features are implemented.
+RTL           | [PORT_FROZEN][]           | Done        | Frozen, except the planned MuBi encoding of the CHERIoT capability tag (`<ISSUE>`), to land before D2S.
+RTL           | [ARCHITECTURE_FROZEN][]   | Done        | Frozen. A lockstepped TRVK is planned for D2S (`<ISSUE>`).
+RTL           | [REVIEW_TODO][]           | Done        | `rv_core_ibex.sv` TODO(#10071): keep, SEC_CM labels of vendored code are repeated in the wrapper until the label check looks into vendored code. `ibex_icache.sv` "TODO sparsify": keep, possible area optimization of the fill buffer age tracking with no functional impact. `ibex_icache.sv` invalidation restart TODO: keep, the restart is needed with `SecureIbex` to get a fresh scramble key. Lint `VAR_INDEX` waivers with a TODO comment: removed, as AscentLint no longer has this rule and lint is clean without them.
+RTL           | [STYLE_X][]               | Done        | None in synthesizable RTL. X is only used in assertion code.
+RTL           | [CDC_SYNCMACRO][]         | Done        | All crossings use `prim_flop_2sync`, `prim_lc_sync`, `prim_esc_receiver` and `prim_sync_reqack_data` (also inside `prim_edn_req`).
+Code Quality  | [LINT_PASS][]             | Done        | Lint passes. Waivers reviewed.
+Code Quality  | [CDC_SETUP][]             | Waived      | No block-level CDC flow. Covered by the Earl Grey chip-level CDC run. `<CONFIRM>`
+Code Quality  | [RDC_SETUP][]             | Waived      | No block-level RDC flow. All resets are LC-derived, so there are no real reset domain crossings inside the block. Covered by the Earl Grey chip-level RDC run. `<CONFIRM>`
+Code Quality  | [AREA_CHECK][]            | Done        | `<ADD NUMBERS>` (target technology synthesis)
+Code Quality  | [TIMING_CHECK][]          | Done        | `<ADD NUMBERS>` (target technology synthesis)
+Security      | [SEC_CM_DOCUMENTED][]     | Done        | All countermeasures are documented in [interfaces.md](interfaces.md#security-countermeasures). Planned for D2S: MuBi capability tag (`<ISSUE>`) and TRVK lockstep (`<ISSUE>`). The CHERIoT mode switch FSM may be reworked but stays sparsely encoded (`CHERIOT_SWITCH.FSM.SPARSE`).
 
 [NEW_FEATURES]:          ../../../../../doc/project_governance/checklist/README.md#new_features
 [BLOCK_DIAGRAM]:         ../../../../../doc/project_governance/checklist/README.md#block_diagram
