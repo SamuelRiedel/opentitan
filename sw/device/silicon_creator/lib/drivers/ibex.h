@@ -181,6 +181,8 @@ typedef enum ibex_nmi_source {
 /**
  * Enables the specified NMI sources.
  *
+ * Sources that are already enabled stay enabled.
+ *
  * @param nmi_src The NMI source(s) to enable.
  */
 void ibex_enable_nmi(ibex_nmi_source_t nmi_src);
