@@ -237,6 +237,22 @@
       bazel: ["//sw/device/tests:rv_core_ibex_mcounteren_writable_test"]
     }
     {
+      name: chip_sw_rv_core_ibex_nmi_enable_lock
+      desc: '''Verify that the NMI enables can be cleared and locked.
+
+            - Enable the watchdog NMI and check that a watchdog bark raises an NMI.
+            - Disable it again and check that a bark only sets `NMI_STATE`.
+            - Re-enable it and lock it with `NMI_ENABLE_REGWEN`.
+            - Check that writes to `NMI_ENABLE` and `NMI_ENABLE_REGWEN` have no effect and that a
+              bark still raises an NMI.
+            '''
+      stage: V2
+      si_stage: SV1
+      lc_states: ["PROD"]
+      tests: ["chip_sw_rv_core_ibex_nmi_enable_lock"]
+      bazel: ["//sw/device/tests:rv_core_ibex_nmi_enable_lock_test"]
+    }
+    {
       name: chip_sw_rv_core_ibex_alerts
       desc: '''Inject and verify all available faults in rv_core_ibex / ibex_top.
 
